@@ -154,24 +154,54 @@ textarea.out{width:100%;min-height:140px;font:13px var(--font-mono);padding:10px
 .sum table{min-width:420px}
 
 body.proj .hide-proj{display:none}
-body.proj .wrap{max-width:none;padding:12px 20px 18px;gap:12px}
-body.proj header{flex-wrap:nowrap;align-items:center}
-body.proj h1{font-size:24px}
-body.proj .sub,body.proj #btnEdit,body.proj .plays{display:none}
-body.proj .panel{border:0;background:transparent;padding:0;gap:10px}
-body.proj .now-label{font-size:clamp(16px,2.4vw,28px)}
-body.proj .chip{font-size:clamp(34px,7.5vw,80px)}
-body.proj .big{font-size:min(25vw,46vh);margin:0}
-body.proj .big-cap{font-size:clamp(16px,2.6vw,30px)}
-body.proj .stat .k{font-size:clamp(14px,2vw,22px)}
-body.proj .stat .v{font-size:clamp(28px,5vw,60px)}
-body.proj .stat .v small{font-size:.5em}
-body.proj .next{font-size:clamp(20px,3.6vw,40px)}
-body.proj .btn{min-height:64px;font-size:20px}
-body.proj .btn.small{min-height:44px;font-size:15px}
+/* Modo proyección: todo cabe en una pantalla (sin scroll). Arriba título y botones, en medio el temporizador que ocupa el espacio sobrante, abajo datos, botones y línea de tiempo. */
+.ptitle{display:none}
+.obra-tag{display:none}
+body.proj .obra-tag{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font:700 clamp(15px,2.6vh,22px)/1 var(--font-body);white-space:nowrap}
+html.projroot,html.projroot body{height:100%;overflow:hidden}
+body.proj{height:100vh;height:100dvh;overflow:hidden}
+body.proj .wrap{max-width:none;height:100vh;height:100dvh;padding:max(8px,1.2vh) max(12px,1.6vw);gap:clamp(4px,1vh,10px);overflow:hidden}
+body.proj header{position:relative;z-index:3;flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+body.proj header > div:first-child{display:none}
+body.proj .ptitle{display:block;flex:1 1 0;min-width:0;font-family:var(--font-display);line-height:1.05;white-space:nowrap;overflow:hidden;font-size:min(7vw,12vh)}
+body.proj .pt-in{display:inline-flex;align-items:baseline;gap:.28em}
+body.proj .pt-dot{display:inline-block;width:.38em;height:.38em;border-radius:.09em;background:var(--t-trans);align-self:center}
+body.proj .pt-pos{font-weight:500;color:var(--muted)}
+body.proj .pt-name{font-weight:700;color:var(--ink)}
+body.proj .tools{flex:0 0 auto}
+body.proj #btnEdit,body.proj .plays{display:none}
+body.proj .panel{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;border:0;background:transparent;padding:0;gap:clamp(4px,1vh,10px)}
+body.proj .panel > div:first-child{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+body.proj .now-label,body.proj .chip{display:none}
+body.proj .big{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;margin:0;font-size:inherit;line-height:1}
+body.proj .big,body.proj #bigTxt{pointer-events:none}
+body.proj #bigTxt{display:block;white-space:nowrap;line-height:.78;font-size:min(25vw,40vh)}
+body.proj .big-cap{flex:0 0 auto;font-size:clamp(12px,min(2.4vh,3.4vw),24px);min-height:0}
+body.proj .side{flex:0 0 auto;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 12px;border-top:0;padding-top:0}
+body.proj .stat .k{font-size:clamp(11px,min(1.9vh,3vw),15px)}
+body.proj .stat .v{font-size:clamp(15px,min(3.4vh,4.6vw),32px)}
+body.proj .stat .v{white-space:nowrap}
+body.proj .stat .v small{font-size:.55em}
+@media (max-width:480px){body.proj .stat .v small{display:none}}
+body.proj .next{font-size:clamp(15px,min(3.4vh,4.6vw),32px)}
+body.proj .controls{flex:0 0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,128px),1fr));gap:8px;border-top:0;padding-top:0}
+body.proj .controls .btn{min-width:0;min-height:clamp(44px,8vh,64px);font-size:clamp(14px,2.4vh,20px);line-height:1.1;padding:0 10px}
 body.proj .hint{display:none}
-body.proj .segs{height:34px}
-body.proj .legend{font-size:15px}
+body.proj .btn.small{min-height:44px;font-size:15px}
+body.proj .strip-box{flex:0 0 auto;gap:4px}
+body.proj .strip{padding:3px 0}
+body.proj .segs{height:clamp(16px,3.6vh,34px)}
+body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
+@media (max-width:640px){
+  body.proj .ptitle{flex-basis:100%;order:1}
+  body.proj .tools{order:2;flex:1 1 100%;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+  body.proj .tools .btn.small{padding:0 10px;font-size:14px}
+  body.proj .obra-tag{padding:0 12px;margin-right:auto}
+}
+@media (max-height:480px){
+  body.proj .legend{display:none}
+  body.proj .big-cap{display:none}
+}
 
 @media (prefers-reduced-motion:reduce){.seg{transition:none}}
 </style>
@@ -183,13 +213,15 @@ body.proj .legend{font-size:15px}
       <h1 id="title">Frozen</h1>
       <p class="sub" id="sub">Cronómetro de ensayo</p>
     </div>
+    <div class="ptitle" id="ptitle" aria-live="polite"><span class="pt-in" id="ptInner"><i class="pt-dot" id="ptDot"></i><span class="pt-pos" id="ptPos"></span><b class="pt-name" id="ptName"></b></span></div>
     <div class="tools">
+      <span class="obra-tag" id="obraTag" aria-label="Obra en ensayo">Frozen</span>
       <div class="plays" role="group" aria-label="Obra">
         <button class="btn small" type="button" data-play="frozen" aria-pressed="true">Frozen</button>
         <button class="btn small" type="button" data-play="alicia" aria-pressed="false">Alicia</button>
       </div>
       <button class="btn small" id="btnTheme" type="button" aria-label="Cambiar tema de color">Tema: automático</button>
-      <button class="btn small" id="btnProj"aria-pressed="false" type="button">Modo proyección</button>
+      <button class="btn small" id="btnProj" aria-pressed="false" type="button">Modo proyección</button>
       <button class="btn small" id="btnEdit" aria-pressed="false" type="button">Editar tiempos</button>
     </div>
   </header>
@@ -198,7 +230,7 @@ body.proj .legend{font-size:15px}
     <div>
       <div class="now-label"><span id="pos">Parte actual</span></div>
       <div class="chip" style="margin-top:6px"><span class="dot" id="curDot"></span><span id="curName">Listo para empezar</span></div>
-      <div class="big" id="big" aria-live="off">0:00</div>
+      <div class="big" id="big" aria-live="off"><span id="bigTxt">0:00</span></div>
       <div class="big-cap" id="bigCap"></div>
     </div>
     <div class="side">
@@ -482,12 +514,12 @@ body.proj .legend{font-size:15px}
   /* ---------- pintar ---------- */
   function render(){
     var i = S.idx, fin = i >= n();
-    var big = $("big");
+    var big = $("big"), bigTxt = $("bigTxt");
     if(fin){
       $("pos").textContent = "Fin del ensayo";
       $("curName").textContent = "Obra terminada";
       $("curDot").style.background = "var(--accent)";
-      big.textContent = hms(clockSec());
+      bigTxt.textContent = hms(clockSec());
       big.className = "big";
       $("bigCap").innerHTML = "Tiempo real de la obra. El plan era <strong>" + hms(totalPlan()) + "</strong>.";
       $("next").textContent = "—";
@@ -497,8 +529,8 @@ body.proj .legend{font-size:15px}
       $("curName").textContent = p.t;
       $("curDot").style.background = "var(--t-" + GROUP[p.t] + ")";
       var rem = Math.ceil(dur(i) - elapsedSec());
-      if(rem >= 0){ big.textContent = ms(rem); big.className = "big" + (rem <= 10 && dur(i) > 20 ? " warn" : ""); }
-      else { big.textContent = "+" + ms(-rem); big.className = "big over"; }
+      if(rem >= 0){ bigTxt.textContent = ms(rem); big.className = "big" + (rem <= 10 && dur(i) > 20 ? " warn" : ""); }
+      else { bigTxt.textContent = "+" + ms(-rem); big.className = "big over"; }
       $("bigCap").innerHTML = (rem >= 0 ? "Tiempo restante" : "Tiempo excedido") + " · plan <strong>" + ms(dur(i)) + "</strong> · transcurrido <strong>" + ms(elapsedSec()) + "</strong>";
       if(i + 1 < n()){
         var q = plan[i+1];
@@ -546,7 +578,11 @@ body.proj .legend{font-size:15px}
         else { diffEl.textContent = signed(df); diffEl.className = "t r diff under"; }
       }
     }
+    $("ptPos").textContent = fin ? "" : $("pos").textContent + ":";
+    $("ptName").textContent = fin ? "Obra terminada" : $("curName").textContent;
+    $("ptDot").style.background = $("curDot").style.background;
     renderSummary();
+    fitAll();
   }
   function renderSummary(){
     var h = "";
@@ -562,6 +598,40 @@ body.proj .legend{font-size:15px}
     }
     $("sumRows").innerHTML = h;
   }
+
+  /* ---------- ajuste de tamaño en modo proyección ---------- */
+  var ptKey = "", bigKey = "";
+  function isProj(){ return document.body.classList.contains("proj"); }
+  function fitTitle(){
+    var box = $("ptitle"), inn = $("ptInner");
+    if(!isProj()){ box.style.fontSize = ""; ptKey = ""; return; }
+    var avail = box.clientWidth;
+    if(!avail) return;
+    var key = inn.textContent + "|" + avail + "|" + window.innerWidth + "x" + window.innerHeight;
+    if(key === ptKey) return;
+    ptKey = key;
+    box.style.fontSize = "100px";
+    var w = inn.getBoundingClientRect().width || 1;
+    var max = Math.min(window.innerWidth * 0.07, window.innerHeight * 0.12);
+    box.style.fontSize = Math.max(14, Math.min(max, 100 * avail * 0.985 / w)) + "px";
+  }
+  function fitBig(){
+    var box = $("big"), t = $("bigTxt");
+    if(!isProj()){ t.style.fontSize = ""; bigKey = ""; return; }
+    var W = box.clientWidth, H = box.clientHeight;
+    if(!W || !H) return;
+    var key = t.textContent.length + "|" + W + "x" + H;
+    if(key === bigKey) return;
+    bigKey = key;
+    t.style.fontSize = "100px";
+    var w = t.getBoundingClientRect().width || 1;
+    t.style.fontSize = Math.max(20, Math.min(100 * W * 0.98 / w, H / 0.78)) + "px";
+  }
+  function fitAll(){ fitTitle(); fitBig(); }
+  window.addEventListener("resize", fitAll);
+  window.addEventListener("orientationchange", function(){ setTimeout(fitAll, 150); });
+  document.addEventListener("fullscreenchange", function(){ setTimeout(fitAll, 150); });
+  try{ if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ ptKey = ""; bigKey = ""; fitAll(); }); }catch(e){}
 
   /* ---------- reloj ---------- */
   setInterval(function(){
@@ -661,6 +731,10 @@ body.proj .legend{font-size:15px}
     document.body.classList.toggle("proj", on);
     this.setAttribute("aria-pressed", on ? "true" : "false");
     this.textContent = on ? "Salir de proyección" : "Modo proyección";
+    document.documentElement.classList.toggle("projroot", on);
+    ptKey = ""; bigKey = "";
+    fitAll();
+    setTimeout(fitAll, 120);
     try{
       if(on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function(){});
       else if(!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
@@ -745,6 +819,7 @@ body.proj .legend{font-size:15px}
     SUMMARY[3].label = PLAYS[key].danza;
     $("legDanza").textContent = PLAYS[key].danza;
     $("title").textContent = PLAYS[key].name;
+    $("obraTag").textContent = PLAYS[key].name;
     document.title = "Cronómetro " + PLAYS[key].name;
     var bs = document.querySelectorAll("[data-play]");
     for(var b = 0; b < bs.length; b++) bs[b].setAttribute("aria-pressed", bs[b].getAttribute("data-play") === key ? "true" : "false");
