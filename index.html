@@ -127,7 +127,7 @@ h1{font-family:var(--font-display);font-size:clamp(30px,6vw,44px);line-height:1;
 
 section h2{font-family:var(--font-display);font-size:22px;margin:0 0 10px;font-weight:600}
 .scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
-table{border-collapse:collapse;width:100%;min-width:600px;font-variant-numeric:tabular-nums}
+table{border-collapse:collapse;width:100%;min-width:480px;font-variant-numeric:tabular-nums}
 th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font-size:13px;color:var(--muted);font-weight:600;background:var(--surface);position:sticky;top:0}
 tbody tr:last-child td{border-bottom:0}
@@ -138,8 +138,9 @@ tr.cur td:first-child{box-shadow:inset 4px 0 0 var(--accent)}
 tr.skip td{color:var(--muted)}
 tbody tr.row{cursor:pointer}
 body.editing tbody tr.row{cursor:default}
-.go{font:600 14px var(--font-mono);background:none;border:1px solid transparent;border-radius:6px;min-width:34px;min-height:30px;color:var(--muted);cursor:pointer}
+.go{display:inline-flex;align-items:center;justify-content:center;background:none;border:1px solid transparent;border-radius:6px;min-width:34px;min-height:30px;color:var(--muted);cursor:pointer}
 .go:hover{border-color:var(--accent);color:var(--ink)}
+.tri{display:block;width:0;height:0;border-style:solid;border-width:6px 0 6px 10px;border-color:transparent transparent transparent currentColor}
 .type{display:inline-flex;align-items:center;gap:8px}
 .diff.over{color:var(--bad);font-weight:600}
 .diff.under{color:var(--accent);font-weight:600}
@@ -163,7 +164,7 @@ body.proj{height:100vh;height:100dvh;overflow:hidden}
 body.proj .wrap{max-width:none;height:100vh;height:100dvh;padding:max(8px,1.2vh) max(12px,1.6vw);gap:clamp(4px,1vh,10px);overflow:hidden}
 body.proj header{position:relative;z-index:3;flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 body.proj header > div:first-child{display:none}
-body.proj .ptitle{display:block;flex:1 1 0;min-width:0;font-family:var(--font-display);line-height:1.05;white-space:nowrap;overflow:hidden;font-size:min(7vw,12vh)}
+body.proj .ptitle{display:block;flex:1 1 0;min-width:0;font-family:var(--font-display);line-height:1.05;white-space:nowrap;overflow:hidden;font-size:min(8.5vw,13.5vh)}
 body.proj .pt-in{display:inline-flex;align-items:baseline;gap:.28em}
 body.proj .pt-dot{display:inline-block;width:.38em;height:.38em;border-radius:.09em;background:var(--t-trans);align-self:center}
 body.proj .pt-pos{font-weight:500;color:var(--muted)}
@@ -197,6 +198,12 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   body.proj .tools{order:2;flex:1 1 100%;flex-wrap:wrap;justify-content:flex-end;gap:6px}
   body.proj .tools .btn.small{padding:0 10px;font-size:14px}
   body.proj .obra-tag{padding:0 12px;margin-right:auto}
+  body.proj .controls{grid-template-columns:1fr 1fr}
+  body.proj #btnPrev{order:1}
+  body.proj #btnNext{order:2}
+  body.proj #btnGo{order:3;grid-column:1 / -1}
+  body.proj #btnReset{order:4}
+  body.proj #btnAuto{order:5}
 }
 @media (max-height:480px){
   body.proj .legend{display:none}
@@ -213,7 +220,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       <h1 id="title">Frozen</h1>
       <p class="sub" id="sub">Cronómetro de ensayo</p>
     </div>
-    <div class="ptitle" id="ptitle" aria-live="polite"><span class="pt-in" id="ptInner"><i class="pt-dot" id="ptDot"></i><span class="pt-pos" id="ptPos"></span><b class="pt-name" id="ptName"></b></span></div>
+    <div class="ptitle" id="ptitle" aria-live="polite"><span class="pt-in" id="ptInner"><i class="pt-dot" id="ptDot"></i><b class="pt-name" id="ptName"></b></span></div>
     <div class="tools">
       <span class="obra-tag" id="obraTag" aria-label="Obra en ensayo">Frozen</span>
       <div class="plays" role="group" aria-label="Obra">
@@ -228,7 +235,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   <div class="panel" aria-label="Estado del ensayo">
     <div>
-      <div class="now-label"><span id="pos">Parte actual</span></div>
+      <div class="now-label"><span id="pos">Ahora</span></div>
       <div class="chip" style="margin-top:6px"><span class="dot" id="curDot"></span><span id="curName">Listo para empezar</span></div>
       <div class="big" id="big" aria-live="off"><span id="bigTxt">0:00</span></div>
       <div class="big-cap" id="bigCap"></div>
@@ -239,9 +246,9 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       <div class="stat"><span class="k">Sigue</span><span class="next" id="next">—</span></div>
     </div>
     <div class="controls">
+      <button class="btn" id="btnPrev" type="button">&larr; Anterior</button>
       <button class="btn primary" id="btnGo" type="button">Iniciar</button>
-      <button class="btn" id="btnNext" type="button">Siguiente</button>
-      <button class="btn" id="btnPrev" type="button">Anterior</button>
+      <button class="btn" id="btnNext" type="button">Siguiente &rarr;</button>
       <button class="btn" id="btnReset" type="button">Reiniciar</button>
       <button class="btn" id="btnAuto" type="button" aria-pressed="true">Avance automático: sí</button>
       <span class="hint">Espacio: iniciar o pausar · Enter o →: siguiente · ←: anterior</span>
@@ -270,7 +277,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     <div class="scroll">
       <table>
         <thead>
-          <tr><th>#</th><th>Parte</th><th class="t">Inicio</th><th class="t">Final</th><th class="t r">Plan</th><th class="t r">Real</th><th class="t r">Diferencia</th></tr>
+          <tr><th aria-label="Empezar desde esta parte"></th><th>Parte</th><th class="t">Inicio</th><th class="t">Final</th><th class="t r">Duración</th></tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
@@ -300,31 +307,31 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     ["Transición","0:02:28","0:02:58"],
     ["Escena","0:02:59","0:03:18"],
     ["Transición","0:03:19","0:04:00"],
-    ["Canción","0:04:01","0:07:04"],
+    ["Canción","0:04:01","0:07:04","Helado corazón"],
     ["Transición","0:07:05","0:07:37"],
     ["Escena","0:07:38","0:10:22"],
     ["Transición","0:10:23","0:10:53"],
-    ["Canción","0:10:54","0:12:54"],
+    ["Canción","0:10:54","0:12:54","Muñeco de nieve"],
     ["Transición","0:12:55","0:13:26"],
     ["Escena","0:13:27","0:14:50"],
     ["Transición","0:14:51","0:15:32"],
-    ["Canción","0:15:33","0:18:41"],
+    ["Canción","0:15:33","0:18:41","Y si hacemos un muñeco"],
     ["Transición","0:18:42","0:20:00"],
-    ["Canción","0:20:01","0:22:18"],
+    ["Canción","0:20:01","0:22:18","Deck the halls"],
     ["Transición","0:22:19","0:22:50"],
     ["Escena","0:22:51","0:24:56"],
     ["Transición","0:24:57","0:25:26"],
-    ["Canción","0:25:27","0:28:21"],
+    ["Canción","0:25:27","0:28:21","Farolitos"],
     ["Transición","0:28:22","0:29:04"],
     ["Escena","0:29:05","0:36:12"],
     ["Transición","0:36:13","0:36:45"],
     ["Escena","0:36:46","0:40:29"],
     ["Transición","0:40:30","0:40:59"],
-    ["Canción","0:41:00","0:44:40"],
+    ["Canción","0:41:00","0:44:40","Libre soy"],
     ["Transición","0:44:41","0:45:13"],
     ["Escena","0:45:14","0:53:40"],
     ["Transición","0:53:41","0:54:22"],
-    ["Canción","0:54:23","0:59:15"],
+    ["Canción","0:54:23","0:59:15","Billie Jean"],
     ["Transición","0:59:16","0:59:47"],
     ["Escena","0:59:48","1:14:00"],
     ["Baile","1:14:01","1:18:50"]
@@ -420,7 +427,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     for(var i = 0; i < raw.length; i++){
       var a = parse(raw[i][1]), b = parse(raw[i][2]);
       if(!GROUP[raw[i][0]] || a === null || b === null || b <= a) return null;
-      out.push({t: raw[i][0], ini: a, fin: b});
+      out.push({t: raw[i][0], ini: a, fin: b, name: raw[i][3] || ""});
     }
     return out;
   }
@@ -430,7 +437,13 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       if(s){
         var raw = JSON.parse(s);
         if(Array.isArray(raw) && raw.length === ORIGINAL.length){
-          var p = fromRaw(raw);
+          // solo se guardan los tiempos; los nombres siempre vienen de los datos de la obra
+          var ok = true, merged = [];
+          for(var q = 0; q < raw.length; q++){
+            if(!raw[q] || raw[q][0] !== ORIGINAL[q][0]) ok = false;
+            else merged.push([raw[q][0], raw[q][1], raw[q][2], ORIGINAL[q][3]]);
+          }
+          var p = ok ? fromRaw(merged) : null;
           if(p) return p;
         }
       }
@@ -439,7 +452,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   }
   function savePlan(){
     try{
-      var raw = plan.map(function(p){ return [p.t, hms(p.ini), hms(p.fin)]; });
+      var raw = plan.map(function(p){ return [p.t, hms(p.ini), hms(p.fin), p.name]; });
       localStorage.setItem(KEY, JSON.stringify(raw));
     }catch(e){}
   }
@@ -452,6 +465,8 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   function n(){ return plan.length; }
   function dur(i){ return plan[i].fin - plan[i].ini; }
+  // La numeración de las partes es interna: en pantalla solo se ve el nombre.
+  function label(i){ return plan[i].name || plan[i].t; }
   function totalPlan(){ return plan[n()-1].fin; }
   function sumDur(){ var s = 0; for(var i = 0; i < n(); i++) s += dur(i); return s; }
 
@@ -459,7 +474,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   function buildSegs(){
     var h = "";
     for(var i = 0; i < n(); i++){
-      h += '<div class="seg ' + GROUP[plan[i].t] + '" id="seg' + i + '" style="flex:' + dur(i) + ' 0 0" title="' + (i+1) + '. ' + plan[i].t + ' (' + ms(dur(i)) + ')"></div>';
+      h += '<div class="seg ' + GROUP[plan[i].t] + '" id="seg' + i + '" style="flex:' + dur(i) + ' 0 0" title="' + label(i) + ' (' + ms(dur(i)) + ')"></div>';
     }
     $("segs").innerHTML = h;
   }
@@ -469,18 +484,16 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       var p = plan[i];
       var a, b;
       if(edit){
-        a = '<input class="tin" id="ini' + i + '" data-i="' + i + '" data-k="ini" value="' + hms(p.ini) + '" aria-label="Inicio de la parte ' + (i+1) + '" inputmode="numeric">';
-        b = '<input class="tin" id="fin' + i + '" data-i="' + i + '" data-k="fin" value="' + hms(p.fin) + '" aria-label="Final de la parte ' + (i+1) + '" inputmode="numeric">';
+        a = '<input class="tin" id="ini' + i + '" data-i="' + i + '" data-k="ini" value="' + hms(p.ini) + '" aria-label="Inicio de ' + label(i) + '" inputmode="numeric">';
+        b = '<input class="tin" id="fin' + i + '" data-i="' + i + '" data-k="fin" value="' + hms(p.fin) + '" aria-label="Final de ' + label(i) + '" inputmode="numeric">';
       } else {
         a = hms(p.ini); b = hms(p.fin);
       }
       h += '<tr class="row" id="row' + i + '" data-i="' + i + '">' +
-        '<td><button class="go" type="button" data-go="' + i + '" aria-label="Empezar desde la parte ' + (i+1) + ': ' + p.t + '">' + (i+1) + '</button></td>' +
-        '<td><span class="type"><i class="dot" style="background:var(--t-' + GROUP[p.t] + ')"></i>' + p.t + '</span></td>' +
+        '<td><button class="go" type="button" data-go="' + i + '" aria-label="Empezar desde ' + label(i) + '"><i class="tri"></i></button></td>' +
+        '<td><span class="type"><i class="dot" style="background:var(--t-' + GROUP[p.t] + ')"></i>' + label(i) + '</span></td>' +
         '<td class="t">' + a + '</td><td class="t">' + b + '</td>' +
-        '<td class="t r" id="plan' + i + '">' + ms(dur(i)) + '</td>' +
-        '<td class="t r" id="real' + i + '"></td>' +
-        '<td class="t r diff" id="diff' + i + '"></td></tr>';
+        '<td class="t r" id="plan' + i + '">' + ms(dur(i)) + '</td></tr>';
     }
     $("rows").innerHTML = h;
   }
@@ -525,8 +538,8 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       $("next").textContent = "—";
     } else {
       var p = plan[i];
-      $("pos").textContent = "Parte " + (i+1) + " de " + n();
-      $("curName").textContent = p.t;
+      $("pos").textContent = "Ahora";
+      $("curName").textContent = label(i);
       $("curDot").style.background = "var(--t-" + GROUP[p.t] + ")";
       var rem = Math.ceil(dur(i) - elapsedSec());
       if(rem >= 0){ bigTxt.textContent = ms(rem); big.className = "big" + (rem <= 10 && dur(i) > 20 ? " warn" : ""); }
@@ -534,7 +547,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       $("bigCap").innerHTML = (rem >= 0 ? "Tiempo restante" : "Tiempo excedido") + " · plan <strong>" + ms(dur(i)) + "</strong> · transcurrido <strong>" + ms(elapsedSec()) + "</strong>";
       if(i + 1 < n()){
         var q = plan[i+1];
-        $("next").innerHTML = '<b>' + q.t + '</b> (' + ms(dur(i+1)) + ')';
+        $("next").innerHTML = '<b>' + label(i+1) + '</b> (' + ms(dur(i+1)) + ')';
       } else { $("next").textContent = "Última parte"; }
     }
     $("clock").innerHTML = hms(clockSec()) + ' <small>/ ' + hms(totalPlan()) + '</small>';
@@ -562,23 +575,11 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
     // filas
     for(var r = 0; r < n(); r++){
-      var row = $("row" + r), realEl = $("real" + r), diffEl = $("diff" + r);
+      var row = $("row" + r);
       if(!row) continue;
       var done = S.actual[r] != null;
       row.className = "row" + (r === i ? " cur" : (!done && r < i ? " skip" : ""));
-      var rv = null;
-      if(done) rv = S.actual[r];
-      else if(r === i && !fin && S.elapsed > 0) rv = Math.round(elapsedSec());
-      if(rv == null){ realEl.innerHTML = '<span class="dash">—</span>'; diffEl.innerHTML = ""; diffEl.className = "t r diff"; }
-      else {
-        realEl.textContent = ms(rv);
-        var df = rv - dur(r);
-        if(Math.abs(df) <= TOL){ diffEl.textContent = df === 0 ? "0:00" : signed(df); diffEl.className = "t r diff"; }
-        else if(df > 0){ diffEl.textContent = signed(df); diffEl.className = "t r diff over"; }
-        else { diffEl.textContent = signed(df); diffEl.className = "t r diff under"; }
-      }
     }
-    $("ptPos").textContent = fin ? "" : $("pos").textContent + ":";
     $("ptName").textContent = fin ? "Obra terminada" : $("curName").textContent;
     $("ptDot").style.background = $("curDot").style.background;
     renderSummary();
@@ -612,7 +613,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     ptKey = key;
     box.style.fontSize = "100px";
     var w = inn.getBoundingClientRect().width || 1;
-    var max = Math.min(window.innerWidth * 0.07, window.innerHeight * 0.12);
+    var max = Math.min(window.innerWidth * 0.085, window.innerHeight * 0.135);
     box.style.fontSize = Math.max(14, Math.min(max, 100 * avail * 0.985 / w)) + "px";
   }
   function fitBig(){
@@ -683,7 +684,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     if(edit) return;
     S = fresh();
     S.idx = i; S.base = plan[i].ini;
-    setMsg("Empiezas desde la parte " + (i+1) + ". El reloj de la obra arranca en " + hms(plan[i].ini) + ".");
+    setMsg("Empiezas desde \"" + label(i) + "\". El reloj de la obra arranca en " + hms(plan[i].ini) + ".");
     render();
   }
 
@@ -767,7 +768,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     plan[i][k] = v;
     if(plan[i].fin <= plan[i].ini){
       plan[i][k] = old; el.value = hms(old);
-      setMsg("En la parte " + (i+1) + " el final debe ser mayor que el inicio.", true); return;
+      setMsg("En \"" + label(i) + "\" el final debe ser mayor que el inicio.", true); return;
     }
     savePlan(); S = fresh();
     setMsg("Guardado. El cronómetro se reinició con los nuevos tiempos.");
@@ -790,10 +791,10 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   /* ---------- copiar resultados ---------- */
   function resultsText(){
-    var L = ["#\tParte\tInicio\tFinal\tPlan\tReal\tDiferencia"];
+    var L = ["Parte\tInicio\tFinal\tDuración\tReal\tDiferencia"];
     for(var i = 0; i < n(); i++){
       var a = S.actual[i];
-      L.push([i+1, plan[i].t, hms(plan[i].ini), hms(plan[i].fin), ms(dur(i)),
+      L.push([label(i), hms(plan[i].ini), hms(plan[i].fin), ms(dur(i)),
         a != null ? ms(a) : "", a != null ? signed(a - dur(i)) : ""].join("\t"));
     }
     return L.join("\n");
