@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cronómetro de ensayo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Diseño: panel de control arriba (parte actual + cuenta regresiva), franja de la obra completa en proporción, y la tabla de partes debajo. */
+:root{
+  color-scheme: light;
+  --bg:#f2f6fa;
+  --surface:#ffffff;
+  --ink:#13202b;
+  --muted:#586977;
+  --line:#d5dee7;
+  --accent:#1b69a0;
+  --accent-ink:#ffffff;
+  --hl:#e1f0fb;
+  --t-escena:#1b69a0;
+  --t-cancion:#7b4fb8;
+  --t-trans:#8798a5;
+  --t-danza:#c2447b;
+  --good:#1c7f50;
+  --bad:#c0352c;
+  --warn:#a85d00;
+  --font-display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0d1620;
+    --surface:#15212d;
+    --ink:#e8f0f6;
+    --muted:#92a4b3;
+    --line:#26384a;
+    --accent:#5db4ee;
+    --accent-ink:#06121c;
+    --hl:#1a3248;
+    --t-escena:#5db4ee;
+    --t-cancion:#b498e8;
+    --t-trans:#7a8c9a;
+    --t-danza:#ef86b1;
+    --good:#4cc788;
+    --bad:#ff7d73;
+    --warn:#ffb454;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0d1620;
+  --surface:#15212d;
+  --ink:#e8f0f6;
+  --muted:#92a4b3;
+  --line:#26384a;
+  --accent:#5db4ee;
+  --accent-ink:#06121c;
+  --hl:#1a3248;
+  --t-escena:#5db4ee;
+  --t-cancion:#b498e8;
+  --t-trans:#7a8c9a;
+  --t-danza:#ef86b1;
+  --good:#4cc788;
+  --bad:#ff7d73;
+    --warn:#ffb454;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.45}
+.wrap{max-width:1060px;margin:0 auto;padding:20px 16px 56px;display:flex;flex-direction:column;gap:18px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+h1{font-family:var(--font-display);font-size:clamp(30px,6vw,44px);line-height:1;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.sub{margin:6px 0 0;color:var(--muted);font-size:15px}
+.tools{display:flex;flex-wrap:wrap;gap:8px}
+.plays{display:flex;gap:8px;margin-right:8px}
+
+.btn{font:600 15px/1 var(--font-body);min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);min-width:120px}
+.btn.small{min-height:36px;font-size:14px;padding:0 12px}
+.btn[aria-pressed="true"]{background:var(--hl);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+.panel > div:first-child{text-align:center}
+.now-label{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:15px;font-weight:500}
+.chip{display:inline-flex;align-items:center;gap:10px;font-weight:600;color:var(--ink);font-size:clamp(24px,4.5vw,40px)}
+.dot{width:12px;height:12px;border-radius:3px;flex:none;background:var(--t-trans)}
+.big{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums;font-size:clamp(110px,26vw,300px);line-height:1;margin:6px 0 4px;letter-spacing:-.03em}
+.big.over{color:var(--bad)}
+.big.warn{color:var(--warn)}
+.big-cap{color:var(--muted);font-size:16px;min-height:22px}
+.big-cap strong{color:var(--ink);font-weight:600}
+.side{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 20px;border-top:1px solid var(--line);padding-top:16px;min-width:0}
+@media (max-width:640px){.side{grid-template-columns:minmax(0,1fr)}}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat .k{font-size:13px;color:var(--muted)}
+.stat .v{font-family:var(--font-mono);font-weight:600;font-size:22px;font-variant-numeric:tabular-nums}
+.stat .v small{font-family:var(--font-body);font-size:14px;font-weight:500;color:var(--muted)}
+.v.late{color:var(--bad)}
+.v.early{color:var(--accent)}
+.next{font-size:15px}
+.next b{font-weight:600}
+.controls{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:6px;border-top:1px solid var(--line)}
+.hint{color:var(--muted);font-size:13px;margin-left:auto}
+@media (max-width:760px){.hint{margin-left:0;width:100%}}
+
+.strip-box{display:flex;flex-direction:column;gap:8px}
+.strip{position:relative;padding:5px 0}
+.segs{display:flex;gap:1px;height:22px;border-radius:6px;overflow:hidden;background:var(--line)}
+.seg{height:100%;min-width:1px;opacity:.38;transition:opacity .2s}
+.seg.done,.seg.cur{opacity:1}
+.seg.escena{background:var(--t-escena)}
+.seg.cancion{background:var(--t-cancion)}
+.seg.trans{background:var(--t-trans)}
+.seg.danza{background:var(--t-danza)}
+.ph{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:var(--ink);border-radius:2px;pointer-events:none}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+
+section h2{font-family:var(--font-display);font-size:22px;margin:0 0 10px;font-weight:600}
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:600px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:13px;color:var(--muted);font-weight:600;background:var(--surface);position:sticky;top:0}
+tbody tr:last-child td{border-bottom:0}
+td.t,th.t{font-family:var(--font-mono);font-weight:500;font-size:15px}
+td.r,th.r{text-align:right}
+tr.cur td{background:var(--hl)}
+tr.cur td:first-child{box-shadow:inset 4px 0 0 var(--accent)}
+tr.skip td{color:var(--muted)}
+tbody tr.row{cursor:pointer}
+body.editing tbody tr.row{cursor:default}
+.go{font:600 14px var(--font-mono);background:none;border:1px solid transparent;border-radius:6px;min-width:34px;min-height:30px;color:var(--muted);cursor:pointer}
+.go:hover{border-color:var(--accent);color:var(--ink)}
+.type{display:inline-flex;align-items:center;gap:8px}
+.diff.over{color:var(--bad);font-weight:600}
+.diff.under{color:var(--accent);font-weight:600}
+.dash{color:var(--muted)}
+input.tin{font:500 15px var(--font-mono);width:92px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.edit-bar{display:none;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;color:var(--muted);font-size:14px}
+body.editing .edit-bar{display:flex}
+.msg{min-height:22px;font-size:14px;color:var(--muted)}
+.msg.err{color:var(--bad)}
+textarea.out{width:100%;min-height:140px;font:13px var(--font-mono);padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+
+.sum table{min-width:420px}
+
+body.proj .hide-proj{display:none}
+body.proj .wrap{max-width:none;padding:12px 20px 18px;gap:12px}
+body.proj header{flex-wrap:nowrap;align-items:center}
+body.proj h1{font-size:24px}
+body.proj .sub,body.proj #btnEdit,body.proj .plays{display:none}
+body.proj .panel{border:0;background:transparent;padding:0;gap:10px}
+body.proj .now-label{font-size:clamp(16px,2.4vw,28px)}
+body.proj .chip{font-size:clamp(34px,7.5vw,80px)}
+body.proj .big{font-size:min(25vw,46vh);margin:0}
+body.proj .big-cap{font-size:clamp(16px,2.6vw,30px)}
+body.proj .stat .k{font-size:clamp(14px,2vw,22px)}
+body.proj .stat .v{font-size:clamp(28px,5vw,60px)}
+body.proj .stat .v small{font-size:.5em}
+body.proj .next{font-size:clamp(20px,3.6vw,40px)}
+body.proj .btn{min-height:64px;font-size:20px}
+body.proj .btn.small{min-height:44px;font-size:15px}
+body.proj .hint{display:none}
+body.proj .segs{height:34px}
+body.proj .legend{font-size:15px}
+
+@media (prefers-reduced-motion:reduce){.seg{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">Frozen</h1>
+      <p class="sub" id="sub">Cronómetro de ensayo</p>
+    </div>
+    <div class="tools">
+      <div class="plays" role="group" aria-label="Obra">
+        <button class="btn small" type="button" data-play="frozen" aria-pressed="true">Frozen</button>
+        <button class="btn small" type="button" data-play="alicia" aria-pressed="false">Alicia</button>
+      </div>
+      <button class="btn small" id="btnTheme" type="button" aria-label="Cambiar tema de color">Tema: automático</button>
+      <button class="btn small" id="btnProj"aria-pressed="false" type="button">Modo proyección</button>
+      <button class="btn small" id="btnEdit" aria-pressed="false" type="button">Editar tiempos</button>
+    </div>
+  </header>
+
+  <div class="panel" aria-label="Estado del ensayo">
+    <div>
+      <div class="now-label"><span id="pos">Parte actual</span></div>
+      <div class="chip" style="margin-top:6px"><span class="dot" id="curDot"></span><span id="curName">Listo para empezar</span></div>
+      <div class="big" id="big" aria-live="off">0:00</div>
+      <div class="big-cap" id="bigCap"></div>
+    </div>
+    <div class="side">
+      <div class="stat"><span class="k">Reloj de la obra</span><span class="v" id="clock">0:00:00 <small>/ 1:18:50</small></span></div>
+      <div class="stat"><span class="k">Frente al plan</span><span class="v" id="drift">Al día</span></div>
+      <div class="stat"><span class="k">Sigue</span><span class="next" id="next">—</span></div>
+    </div>
+    <div class="controls">
+      <button class="btn primary" id="btnGo" type="button">Iniciar</button>
+      <button class="btn" id="btnNext" type="button">Siguiente</button>
+      <button class="btn" id="btnPrev" type="button">Anterior</button>
+      <button class="btn" id="btnReset" type="button">Reiniciar</button>
+      <button class="btn" id="btnAuto" type="button" aria-pressed="true">Avance automático: sí</button>
+      <span class="hint">Espacio: iniciar o pausar · Enter o →: siguiente · ←: anterior</span>
+    </div>
+  </div>
+
+  <div class="strip-box">
+    <div class="strip" id="strip" role="img" aria-label="Línea de tiempo de la obra completa, con cada parte en proporción a su duración">
+      <div class="segs" id="segs"></div>
+      <div class="ph" id="ph" style="left:0%"></div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--t-escena)"></i>Escena</span>
+      <span><i class="dot" style="background:var(--t-cancion)"></i>Canción</span>
+      <span><i class="dot" style="background:var(--t-trans)"></i>Transición</span>
+      <span><i class="dot" style="background:var(--t-danza)"></i><span id="legDanza">Ballet y baile</span></span>
+    </div>
+  </div>
+
+  <section class="hide-proj">
+    <h2>Partes de la obra</h2>
+    <div class="edit-bar">
+      <span>Escribe los tiempos como h:mm:ss. Haz clic fuera de la casilla para guardar.</span>
+      <button class="btn small" id="btnRestore" type="button">Restaurar tiempos originales</button>
+    </div>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Parte</th><th class="t">Inicio</th><th class="t">Final</th><th class="t r">Plan</th><th class="t r">Real</th><th class="t r">Diferencia</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="msg" id="msg" role="status"></p>
+  </section>
+
+  <section class="hide-proj sum">
+    <h2>Resumen por tipo</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Tipo</th><th class="r">Partes</th><th class="t r">Plan</th><th class="t r">Real</th></tr></thead>
+        <tbody id="sumRows"></tbody>
+      </table>
+    </div>
+    <p style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 0">
+      <button class="btn small" id="btnCopy" type="button">Copiar resultados</button>
+    </p>
+    <div id="copyBox"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var FROZEN = [
+    ["Ballet","0:00:00","0:02:27"],
+    ["Transición","0:02:28","0:02:58"],
+    ["Escena","0:02:59","0:03:18"],
+    ["Transición","0:03:19","0:04:00"],
+    ["Canción","0:04:01","0:07:04"],
+    ["Transición","0:07:05","0:07:37"],
+    ["Escena","0:07:38","0:10:22"],
+    ["Transición","0:10:23","0:10:53"],
+    ["Canción","0:10:54","0:12:54"],
+    ["Transición","0:12:55","0:13:26"],
+    ["Escena","0:13:27","0:14:50"],
+    ["Transición","0:14:51","0:15:32"],
+    ["Canción","0:15:33","0:18:41"],
+    ["Transición","0:18:42","0:20:00"],
+    ["Canción","0:20:01","0:22:18"],
+    ["Transición","0:22:19","0:22:50"],
+    ["Escena","0:22:51","0:24:56"],
+    ["Transición","0:24:57","0:25:26"],
+    ["Canción","0:25:27","0:28:21"],
+    ["Transición","0:28:22","0:29:04"],
+    ["Escena","0:29:05","0:36:12"],
+    ["Transición","0:36:13","0:36:45"],
+    ["Escena","0:36:46","0:40:29"],
+    ["Transición","0:40:30","0:40:59"],
+    ["Canción","0:41:00","0:44:40"],
+    ["Transición","0:44:41","0:45:13"],
+    ["Escena","0:45:14","0:53:40"],
+    ["Transición","0:53:41","0:54:22"],
+    ["Canción","0:54:23","0:59:15"],
+    ["Transición","0:59:16","0:59:47"],
+    ["Escena","0:59:48","1:14:00"],
+    ["Baile","1:14:01","1:18:50"]
+  ];
+  var ALICIA = [
+    ["Baile","0:00:00","0:05:40"],
+    ["Transición","0:05:41","0:06:10"],
+    ["Baile","0:06:11","0:09:25"],
+    ["Transición","0:09:26","0:09:57"],
+    ["Escena","0:09:58","0:13:02"],
+    ["Transición","0:13:03","0:13:45"],
+    ["Canción","0:13:46","0:16:56"],
+    ["Transición","0:16:57","0:17:38"],
+    ["Escena","0:17:39","0:24:14"],
+    ["Transición","0:24:15","0:24:46"],
+    ["Baile","0:24:47","0:28:02"],
+    ["Transición","0:28:03","0:28:44"],
+    ["Escena","0:28:45","0:34:45"],
+    ["Transición","0:34:46","0:35:14"],
+    ["Canción","0:35:15","0:40:19"],
+    ["Transición","0:40:20","0:40:51"],
+    ["Escena","0:40:52","0:46:46"],
+    ["Transición","0:46:47","0:47:16"],
+    ["Baile","0:47:17","0:53:41"],
+    ["Transición","0:53:42","0:54:13"],
+    ["Escena","0:54:14","1:01:15"],
+    ["Transición","1:01:16","1:01:57"],
+    ["Canción","1:01:58","1:04:29"],
+    ["Transición","1:04:30","1:04:59"],
+    ["Escena","1:05:00","1:11:00"],
+    ["Transición","1:11:01","1:11:42"],
+    ["Canción Épica","1:11:43","1:14:43"],
+    ["Transición","1:14:44","1:15:15"],
+    ["Escena","1:15:16","1:16:32"],
+    ["Transición","1:16:33","1:17:15"],
+    ["Baile","1:17:16","1:20:26"],
+    ["Transición","1:20:27","1:20:58"],
+    ["Escena","1:20:59","1:23:10"],
+    ["Transición","1:23:11","1:23:53"],
+    ["Baile","1:23:54","1:27:56"],
+    ["Transición","1:27:57","1:28:28"],
+    ["Baile","1:28:29","1:33:04"]
+  ];
+  var PLAYS = {
+    frozen: {name:"Frozen", key:"frozen-plan-v1", danza:"Ballet y baile", rows:FROZEN},
+    alicia: {name:"Alicia", key:"alicia-plan-v1", danza:"Bailes", rows:ALICIA}
+  };
+  var CUR = "frozen";
+  try{
+    var hh = (location.hash || "").replace("#","");
+    var sp = localStorage.getItem("frozen-play");
+    if(PLAYS[hh]) CUR = hh; else if(PLAYS[sp]) CUR = sp;
+  }catch(e){}
+  var ORIGINAL = PLAYS[CUR].rows;
+  var GROUP = {"Ballet":"danza","Baile":"danza","Escena":"escena","Canción":"cancion","Canción Épica":"cancion","Transición":"trans"};
+  var SUMMARY = [
+    {g:"escena", label:"Escenas"},
+    {g:"cancion", label:"Canciones"},
+    {g:"trans", label:"Transiciones"},
+    {g:"danza", label:"Ballet y baile"}
+  ];
+  var KEY = PLAYS[CUR].key;
+  var TOL = 5; // segundos de tolerancia para marcar diferencias
+
+  function $(id){ return document.getElementById(id); }
+  function pad(n){ return n < 10 ? "0" + n : "" + n; }
+
+  function parse(t){
+    var m = String(t).trim().match(/^(?:(\d+):)?(\d{1,3}):(\d{2})$/);
+    if(!m) return null;
+    var h = m[1] === undefined ? null : parseInt(m[1],10);
+    var mi = parseInt(m[2],10), s = parseInt(m[3],10);
+    if(s > 59) return null;
+    if(h !== null && mi > 59) return null;
+    return (h || 0) * 3600 + mi * 60 + s;
+  }
+  function hms(sec){
+    sec = Math.max(0, Math.round(sec));
+    return Math.floor(sec/3600) + ":" + pad(Math.floor(sec%3600/60)) + ":" + pad(sec%60);
+  }
+  function ms(sec){
+    sec = Math.max(0, Math.round(sec));
+    if(sec >= 3600) return hms(sec);
+    return Math.floor(sec/60) + ":" + pad(sec%60);
+  }
+  function signed(sec){
+    var r = Math.round(sec);
+    return (r < 0 ? "−" : "+") + ms(Math.abs(r));
+  }
+
+  function fromRaw(raw){
+    var out = [];
+    for(var i = 0; i < raw.length; i++){
+      var a = parse(raw[i][1]), b = parse(raw[i][2]);
+      if(!GROUP[raw[i][0]] || a === null || b === null || b <= a) return null;
+      out.push({t: raw[i][0], ini: a, fin: b});
+    }
+    return out;
+  }
+  function loadPlan(){
+    try{
+      var s = localStorage.getItem(KEY);
+      if(s){
+        var raw = JSON.parse(s);
+        if(Array.isArray(raw) && raw.length === ORIGINAL.length){
+          var p = fromRaw(raw);
+          if(p) return p;
+        }
+      }
+    }catch(e){}
+    return fromRaw(ORIGINAL);
+  }
+  function savePlan(){
+    try{
+      var raw = plan.map(function(p){ return [p.t, hms(p.ini), hms(p.fin)]; });
+      localStorage.setItem(KEY, JSON.stringify(raw));
+    }catch(e){}
+  }
+
+  var plan = loadPlan();
+  var edit = false;
+  var S;
+  function fresh(){ return {idx:0, running:false, elapsed:0, last:0, actual:[], base:0}; }
+  S = fresh();
+
+  function n(){ return plan.length; }
+  function dur(i){ return plan[i].fin - plan[i].ini; }
+  function totalPlan(){ return plan[n()-1].fin; }
+  function sumDur(){ var s = 0; for(var i = 0; i < n(); i++) s += dur(i); return s; }
+
+  /* ---------- construcción ---------- */
+  function buildSegs(){
+    var h = "";
+    for(var i = 0; i < n(); i++){
+      h += '<div class="seg ' + GROUP[plan[i].t] + '" id="seg' + i + '" style="flex:' + dur(i) + ' 0 0" title="' + (i+1) + '. ' + plan[i].t + ' (' + ms(dur(i)) + ')"></div>';
+    }
+    $("segs").innerHTML = h;
+  }
+  function buildRows(){
+    var h = "";
+    for(var i = 0; i < n(); i++){
+      var p = plan[i];
+      var a, b;
+      if(edit){
+        a = '<input class="tin" id="ini' + i + '" data-i="' + i + '" data-k="ini" value="' + hms(p.ini) + '" aria-label="Inicio de la parte ' + (i+1) + '" inputmode="numeric">';
+        b = '<input class="tin" id="fin' + i + '" data-i="' + i + '" data-k="fin" value="' + hms(p.fin) + '" aria-label="Final de la parte ' + (i+1) + '" inputmode="numeric">';
+      } else {
+        a = hms(p.ini); b = hms(p.fin);
+      }
+      h += '<tr class="row" id="row' + i + '" data-i="' + i + '">' +
+        '<td><button class="go" type="button" data-go="' + i + '" aria-label="Empezar desde la parte ' + (i+1) + ': ' + p.t + '">' + (i+1) + '</button></td>' +
+        '<td><span class="type"><i class="dot" style="background:var(--t-' + GROUP[p.t] + ')"></i>' + p.t + '</span></td>' +
+        '<td class="t">' + a + '</td><td class="t">' + b + '</td>' +
+        '<td class="t r" id="plan' + i + '">' + ms(dur(i)) + '</td>' +
+        '<td class="t r" id="real' + i + '"></td>' +
+        '<td class="t r diff" id="diff' + i + '"></td></tr>';
+    }
+    $("rows").innerHTML = h;
+  }
+  function buildAll(){
+    buildSegs(); buildRows();
+    $("sub").textContent = "Cronómetro de ensayo · duración total " + hms(totalPlan());
+    render();
+  }
+
+  /* ---------- cálculos ---------- */
+  function elapsedSec(){ return S.elapsed / 1000; }
+  function completedSum(){
+    var s = 0;
+    for(var j = 0; j < S.idx && j < n(); j++) if(S.actual[j] != null) s += S.actual[j];
+    return s;
+  }
+  function driftSec(){
+    var d = 0;
+    for(var j = 0; j < S.idx && j < n(); j++) if(S.actual[j] != null) d += S.actual[j] - dur(j);
+    if(S.idx < n()){ var e = elapsedSec() - dur(S.idx); if(e > 0) d += e; }
+    return d;
+  }
+  // El reloj de la obra suma el hueco de 1 s que hay entre una parte y la siguiente en el plan.
+  function gap(j){ return j + 1 < n() ? Math.max(0, plan[j+1].ini - plan[j].fin) : 0; }
+  function clockSec(){
+    var s = S.base;
+    for(var j = 0; j < S.idx && j < n(); j++) if(S.actual[j] != null) s += S.actual[j] + gap(j);
+    return s + (S.idx < n() ? elapsedSec() : 0);
+  }
+
+  /* ---------- pintar ---------- */
+  function render(){
+    var i = S.idx, fin = i >= n();
+    var big = $("big");
+    if(fin){
+      $("pos").textContent = "Fin del ensayo";
+      $("curName").textContent = "Obra terminada";
+      $("curDot").style.background = "var(--accent)";
+      big.textContent = hms(clockSec());
+      big.className = "big";
+      $("bigCap").innerHTML = "Tiempo real de la obra. El plan era <strong>" + hms(totalPlan()) + "</strong>.";
+      $("next").textContent = "—";
+    } else {
+      var p = plan[i];
+      $("pos").textContent = "Parte " + (i+1) + " de " + n();
+      $("curName").textContent = p.t;
+      $("curDot").style.background = "var(--t-" + GROUP[p.t] + ")";
+      var rem = Math.ceil(dur(i) - elapsedSec());
+      if(rem >= 0){ big.textContent = ms(rem); big.className = "big" + (rem <= 10 && dur(i) > 20 ? " warn" : ""); }
+      else { big.textContent = "+" + ms(-rem); big.className = "big over"; }
+      $("bigCap").innerHTML = (rem >= 0 ? "Tiempo restante" : "Tiempo excedido") + " · plan <strong>" + ms(dur(i)) + "</strong> · transcurrido <strong>" + ms(elapsedSec()) + "</strong>";
+      if(i + 1 < n()){
+        var q = plan[i+1];
+        $("next").innerHTML = '<b>' + q.t + '</b> (' + ms(dur(i+1)) + ')';
+      } else { $("next").textContent = "Última parte"; }
+    }
+    $("clock").innerHTML = hms(clockSec()) + ' <small>/ ' + hms(totalPlan()) + '</small>';
+    var d = Math.round(driftSec()), dv = $("drift");
+    if(Math.abs(d) <= TOL && !(fin && d !== 0)){ dv.textContent = "Al día"; dv.className = "v"; }
+    else if(d > 0){ dv.innerHTML = "+" + ms(d) + " <small>atraso</small>"; dv.className = "v late"; }
+    else { dv.innerHTML = "−" + ms(-d) + " <small>adelanto</small>"; dv.className = "v early"; }
+
+    // botones
+    var go = $("btnGo");
+    go.textContent = S.running ? "Pausar" : (S.elapsed > 0 || S.idx > 0 ? "Continuar" : "Iniciar");
+    go.disabled = fin;
+    $("btnNext").disabled = fin;
+    $("btnPrev").disabled = (S.idx === 0 && S.elapsed === 0);
+
+    // franja
+    var tp = sumDur(), before = 0;
+    for(var k = 0; k < Math.min(i, n()); k++) before += dur(k);
+    var within = fin ? 0 : Math.min(elapsedSec(), dur(i));
+    $("ph").style.left = (tp ? Math.min(100, (before + within) / tp * 100) : 0) + "%";
+    for(var s = 0; s < n(); s++){
+      var el = $("seg" + s);
+      if(el) el.className = "seg " + GROUP[plan[s].t] + (s === i ? " cur" : (S.actual[s] != null ? " done" : ""));
+    }
+
+    // filas
+    for(var r = 0; r < n(); r++){
+      var row = $("row" + r), realEl = $("real" + r), diffEl = $("diff" + r);
+      if(!row) continue;
+      var done = S.actual[r] != null;
+      row.className = "row" + (r === i ? " cur" : (!done && r < i ? " skip" : ""));
+      var rv = null;
+      if(done) rv = S.actual[r];
+      else if(r === i && !fin && S.elapsed > 0) rv = Math.round(elapsedSec());
+      if(rv == null){ realEl.innerHTML = '<span class="dash">—</span>'; diffEl.innerHTML = ""; diffEl.className = "t r diff"; }
+      else {
+        realEl.textContent = ms(rv);
+        var df = rv - dur(r);
+        if(Math.abs(df) <= TOL){ diffEl.textContent = df === 0 ? "0:00" : signed(df); diffEl.className = "t r diff"; }
+        else if(df > 0){ diffEl.textContent = signed(df); diffEl.className = "t r diff over"; }
+        else { diffEl.textContent = signed(df); diffEl.className = "t r diff under"; }
+      }
+    }
+    renderSummary();
+  }
+  function renderSummary(){
+    var h = "";
+    for(var g = 0; g < SUMMARY.length; g++){
+      var cnt = 0, pl = 0, rl = 0, any = false;
+      for(var i = 0; i < n(); i++){
+        if(GROUP[plan[i].t] !== SUMMARY[g].g) continue;
+        cnt++; pl += dur(i);
+        if(S.actual[i] != null){ rl += S.actual[i]; any = true; }
+      }
+      h += '<tr><td><span class="type"><i class="dot" style="background:var(--t-' + SUMMARY[g].g + ')"></i>' + SUMMARY[g].label + '</span></td>' +
+           '<td class="r">' + cnt + '</td><td class="t r">' + ms(pl) + '</td><td class="t r">' + (any ? ms(rl) : '<span class="dash">—</span>') + '</td></tr>';
+    }
+    $("sumRows").innerHTML = h;
+  }
+
+  /* ---------- reloj ---------- */
+  setInterval(function(){
+    if(S.running){
+      var now = performance.now();
+      S.elapsed += now - S.last; S.last = now;
+      if(auto){
+        // pasa solo a la parte siguiente al cumplirse el tiempo del plan, sin perder el sobrante
+        while(S.idx < n() && S.elapsed >= dur(S.idx) * 1000){
+          S.actual[S.idx] = dur(S.idx);
+          S.elapsed -= dur(S.idx) * 1000;
+          S.idx++;
+        }
+        if(S.idx >= n()){ S.running = false; S.elapsed = 0; }
+      }
+      render();
+    }
+  }, 100);
+
+  function toggle(){
+    if(S.idx >= n()) return;
+    if(S.running){ S.running = false; }
+    else {
+      S.running = true; S.last = performance.now();
+      try{ if(navigator.wakeLock) navigator.wakeLock.request("screen").catch(function(){}); }catch(e){}
+    }
+    render();
+  }
+  function next(){
+    if(S.idx >= n()) return;
+    if(S.elapsed > 0) S.actual[S.idx] = Math.round(S.elapsed / 1000);
+    S.idx++; S.elapsed = 0;
+    if(S.idx >= n()) S.running = false;
+    else if(S.running) S.last = performance.now();
+    render();
+  }
+  function prev(){
+    if(S.idx === 0 && S.elapsed === 0) return;
+    if(S.elapsed > 1500 && S.idx < n()){ S.elapsed = 0; if(S.running) S.last = performance.now(); render(); return; }
+    if(S.idx === 0){ S.elapsed = 0; render(); return; }
+    S.idx--;
+    S.elapsed = (S.actual[S.idx] != null ? S.actual[S.idx] : 0) * 1000;
+    S.actual[S.idx] = null;
+    if(S.running) S.last = performance.now();
+    render();
+  }
+  function reset(){ S = fresh(); setMsg(""); render(); }
+  function jump(i){
+    if(edit) return;
+    S = fresh();
+    S.idx = i; S.base = plan[i].ini;
+    setMsg("Empiezas desde la parte " + (i+1) + ". El reloj de la obra arranca en " + hms(plan[i].ini) + ".");
+    render();
+  }
+
+  function setMsg(t, err){ var m = $("msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); }
+
+  /* ---------- eventos ---------- */
+  /* tema: automático (sigue al dispositivo), claro u oscuro */
+  var THEMES = ["auto", "light", "dark"];
+  var THEME_LABEL = {auto: "Tema: automático", light: "Tema: claro", dark: "Tema: oscuro"};
+  var theme = "auto";
+  try{ var st = localStorage.getItem("frozen-theme"); if(THEMES.indexOf(st) >= 0) theme = st; }catch(e){}
+  function applyTheme(){
+    var root = document.documentElement;
+    if(theme === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
+    $("btnTheme").textContent = THEME_LABEL[theme];
+  }
+  $("btnTheme").addEventListener("click", function(){
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    try{ localStorage.setItem("frozen-theme", theme); }catch(e){}
+    applyTheme();
+  });
+  applyTheme();
+
+  var auto = true;
+  try{ if(localStorage.getItem("frozen-auto") === "0") auto = false; }catch(e){}
+  function applyAuto(){
+    var b = $("btnAuto");
+    b.setAttribute("aria-pressed", auto ? "true" : "false");
+    b.textContent = "Avance automático: " + (auto ? "sí" : "no");
+  }
+  $("btnAuto").addEventListener("click", function(){
+    auto = !auto;
+    try{ localStorage.setItem("frozen-auto", auto ? "1" : "0"); }catch(e){}
+    applyAuto();
+  });
+  applyAuto();
+
+  $("btnGo").addEventListener("click", toggle);
+  $("btnNext").addEventListener("click", next);
+  $("btnPrev").addEventListener("click", prev);
+  $("btnReset").addEventListener("click", reset);
+
+  $("btnProj").addEventListener("click", function(){
+    var on = !document.body.classList.contains("proj");
+    document.body.classList.toggle("proj", on);
+    this.setAttribute("aria-pressed", on ? "true" : "false");
+    this.textContent = on ? "Salir de proyección" : "Modo proyección";
+    try{
+      if(on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function(){});
+      else if(!on && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){});
+    }catch(e){}
+  });
+  $("btnEdit").addEventListener("click", function(){
+    edit = !edit;
+    document.body.classList.toggle("editing", edit);
+    this.setAttribute("aria-pressed", edit ? "true" : "false");
+    this.textContent = edit ? "Terminar edición" : "Editar tiempos";
+    setMsg("");
+    buildAll();
+  });
+  $("btnRestore").addEventListener("click", function(){
+    plan = fromRaw(ORIGINAL); savePlan(); S = fresh(); setMsg("Se restauraron los tiempos originales."); buildAll();
+  });
+
+  $("rows").addEventListener("click", function(e){
+    if(edit) return;
+    var tr = e.target.closest("tr.row");
+    if(tr) jump(parseInt(tr.getAttribute("data-i"), 10));
+  });
+  $("rows").addEventListener("change", function(e){
+    var el = e.target;
+    if(!el.classList.contains("tin")) return;
+    var i = parseInt(el.getAttribute("data-i"), 10), k = el.getAttribute("data-k");
+    var v = parse(el.value);
+    if(v === null){ setMsg("No entendí \"" + el.value + "\". Escríbelo como h:mm:ss, por ejemplo 0:02:27.", true); el.value = hms(plan[i][k]); return; }
+    var old = plan[i][k];
+    plan[i][k] = v;
+    if(plan[i].fin <= plan[i].ini){
+      plan[i][k] = old; el.value = hms(old);
+      setMsg("En la parte " + (i+1) + " el final debe ser mayor que el inicio.", true); return;
+    }
+    savePlan(); S = fresh();
+    setMsg("Guardado. El cronómetro se reinició con los nuevos tiempos.");
+    var f = document.activeElement && document.activeElement.id;
+    buildAll();
+  });
+
+  document.addEventListener("click", function(e){
+    var b = e.target.closest && e.target.closest("button");
+    if(b && e.detail > 0) b.blur();
+  });
+  document.addEventListener("keydown", function(e){
+    var tag = (e.target.tagName || "").toLowerCase();
+    if(tag === "input" || tag === "textarea" || tag === "select" || tag === "button") return;
+    if(e.ctrlKey || e.metaKey || e.altKey) return;
+    if(e.code === "Space"){ e.preventDefault(); toggle(); }
+    else if(e.key === "Enter" || e.key === "ArrowRight"){ e.preventDefault(); next(); }
+    else if(e.key === "ArrowLeft"){ e.preventDefault(); prev(); }
+  });
+
+  /* ---------- copiar resultados ---------- */
+  function resultsText(){
+    var L = ["#\tParte\tInicio\tFinal\tPlan\tReal\tDiferencia"];
+    for(var i = 0; i < n(); i++){
+      var a = S.actual[i];
+      L.push([i+1, plan[i].t, hms(plan[i].ini), hms(plan[i].fin), ms(dur(i)),
+        a != null ? ms(a) : "", a != null ? signed(a - dur(i)) : ""].join("\t"));
+    }
+    return L.join("\n");
+  }
+  $("btnCopy").addEventListener("click", function(){
+    var txt = resultsText(), box = $("copyBox");
+    function fallback(){
+      box.innerHTML = '<p class="msg">No pude copiar solo. Selecciona el texto y cópialo.</p><textarea class="out" id="outTxt" readonly aria-label="Resultados del ensayo"></textarea>';
+      var ta = $("outTxt"); ta.value = txt; ta.focus(); ta.select();
+    }
+    try{
+      navigator.clipboard.writeText(txt).then(function(){
+        box.innerHTML = '<p class="msg" role="status">Resultados copiados. Pégalos en una hoja de cálculo.</p>';
+      }, fallback);
+    }catch(err){ fallback(); }
+  });
+
+  /* ---------- elegir obra ---------- */
+  var pendingPlay = null;
+  function setPlay(key, fromHash){
+    if(!PLAYS[key]) return;
+    CUR = key; ORIGINAL = PLAYS[key].rows; KEY = PLAYS[key].key;
+    SUMMARY[3].label = PLAYS[key].danza;
+    $("legDanza").textContent = PLAYS[key].danza;
+    $("title").textContent = PLAYS[key].name;
+    document.title = "Cronómetro " + PLAYS[key].name;
+    var bs = document.querySelectorAll("[data-play]");
+    for(var b = 0; b < bs.length; b++) bs[b].setAttribute("aria-pressed", bs[b].getAttribute("data-play") === key ? "true" : "false");
+    try{ localStorage.setItem("frozen-play", key); }catch(e){}
+    if(!fromHash){ try{ if(location.hash !== "#" + key) location.hash = key; }catch(e){} }
+    plan = loadPlan(); S = fresh(); pendingPlay = null; setMsg("");
+    buildAll();
+  }
+  document.querySelector(".plays").addEventListener("click", function(e){
+    var b = e.target.closest("[data-play]");
+    if(!b) return;
+    var key = b.getAttribute("data-play");
+    if(key === CUR) return;
+    var busy = S.idx > 0 || S.elapsed > 0;
+    if(busy && pendingPlay !== key){
+      pendingPlay = key;
+      setMsg("Hay un ensayo en curso. Toca \"" + PLAYS[key].name + "\" otra vez para cambiar de obra y perder esos tiempos.", true);
+      return;
+    }
+    setPlay(key, false);
+  });
+  window.addEventListener("hashchange", function(){
+    var k = (location.hash || "").replace("#","");
+    if(PLAYS[k] && k !== CUR) setPlay(k, true);
+  });
+
+  setPlay(CUR, true);
+})();
+</script>
+</body>
+</html>
