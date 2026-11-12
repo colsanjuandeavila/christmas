@@ -164,7 +164,7 @@ body.proj{height:100vh;height:100dvh;overflow:hidden}
 body.proj .wrap{max-width:none;height:100vh;height:100dvh;padding:max(8px,1.2vh) max(12px,1.6vw);gap:clamp(4px,1vh,10px);overflow:hidden}
 body.proj header{position:relative;z-index:3;flex:0 0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 body.proj header > div:first-child{display:none}
-body.proj .ptitle{display:block;flex:1 1 0;min-width:0;font-family:var(--font-display);line-height:1.05;white-space:nowrap;overflow:hidden;font-size:min(8.5vw,13.5vh)}
+body.proj .ptitle{display:block;flex:1 1 0;min-width:0;font-family:var(--font-display);line-height:1;white-space:nowrap;overflow:hidden;font-size:min(11vw,17.5vh)}
 body.proj .pt-in{display:inline-flex;align-items:baseline;gap:.28em}
 body.proj .pt-dot{display:inline-block;width:.38em;height:.38em;border-radius:.09em;background:var(--t-trans);align-self:center}
 body.proj .pt-pos{font-weight:500;color:var(--muted)}
@@ -613,7 +613,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     ptKey = key;
     box.style.fontSize = "100px";
     var w = inn.getBoundingClientRect().width || 1;
-    var max = Math.min(window.innerWidth * 0.085, window.innerHeight * 0.135);
+    var max = Math.min(window.innerWidth * 0.11, window.innerHeight * 0.175);
     box.style.fontSize = Math.max(14, Math.min(max, 100 * avail * 0.985 / w)) + "px";
   }
   function fitBig(){
