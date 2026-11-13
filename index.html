@@ -153,6 +153,7 @@ body.editing .edit-bar{display:flex}
 textarea.out{width:100%;min-height:140px;font:13px var(--font-mono);padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
 
 .sum table{min-width:420px}
+.note{margin:0 0 10px;color:var(--muted);font-size:14px}
 
 body.proj .hide-proj{display:none}
 /* Modo proyección: todo cabe en una pantalla (sin scroll). Arriba título y botones, en medio el temporizador que ocupa el espacio sobrante, abajo datos, botones y línea de tiempo. */
@@ -270,8 +271,9 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   <section class="hide-proj">
     <h2>Partes de la obra</h2>
+    <p class="note">Cada parte dura desde su inicio hasta el inicio de la siguiente. El final indicado es el último segundo de la parte.</p>
     <div class="edit-bar">
-      <span>Escribe los tiempos como h:mm:ss. Haz clic fuera de la casilla para guardar.</span>
+      <span>Escribe los tiempos como h:mm:ss. Haz clic fuera de la casilla para guardar. El final de una parte siempre queda un segundo antes del inicio de la siguiente.</span>
       <button class="btn small" id="btnRestore" type="button">Restaurar tiempos originales</button>
     </div>
     <div class="scroll">
@@ -337,29 +339,29 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     ["Baile","1:14:01","1:18:50"]
   ];
   var ALICIA = [
-    ["Baile","0:00:00","0:05:40"],
+    ["Baile","0:00:00","0:05:40","Baile Happiness"],
     ["Transición","0:05:41","0:06:10"],
-    ["Baile","0:06:11","0:09:25"],
+    ["Baile","0:06:11","0:09:25","Baile Rock and roll"],
     ["Transición","0:09:26","0:09:57"],
     ["Escena","0:09:58","0:13:02"],
     ["Transición","0:13:03","0:13:45"],
-    ["Canción","0:13:46","0:16:56"],
+    ["Canción","0:13:46","0:16:56","Canción francesa"],
     ["Transición","0:16:57","0:17:38"],
     ["Escena","0:17:39","0:24:14"],
     ["Transición","0:24:15","0:24:46"],
-    ["Baile","0:24:47","0:28:02"],
+    ["Baile","0:24:47","0:28:02","Baile Champeta"],
     ["Transición","0:28:03","0:28:44"],
     ["Escena","0:28:45","0:34:45"],
     ["Transición","0:34:46","0:35:14"],
-    ["Canción","0:35:15","0:40:19"],
+    ["Canción","0:35:15","0:40:19","Beat It"],
     ["Transición","0:40:20","0:40:51"],
     ["Escena","0:40:52","0:46:46"],
     ["Transición","0:46:47","0:47:16"],
-    ["Baile","0:47:17","0:53:41"],
+    ["Baile","0:47:17","0:53:41","Baile Jamaican / Popurrí"],
     ["Transición","0:53:42","0:54:13"],
     ["Escena","0:54:14","1:01:15"],
     ["Transición","1:01:16","1:01:57"],
-    ["Canción","1:01:58","1:04:29"],
+    ["Canción","1:01:58","1:04:29","Canto de pilón"],
     ["Transición","1:04:30","1:04:59"],
     ["Escena","1:05:00","1:11:00"],
     ["Transición","1:11:01","1:11:42"],
@@ -367,13 +369,13 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     ["Transición","1:14:44","1:15:15"],
     ["Escena","1:15:16","1:16:32"],
     ["Transición","1:16:33","1:17:15"],
-    ["Baile","1:17:16","1:20:26"],
+    ["Baile","1:17:16","1:20:26","Villancico"],
     ["Transición","1:20:27","1:20:58"],
     ["Escena","1:20:59","1:23:10"],
     ["Transición","1:23:11","1:23:53"],
-    ["Baile","1:23:54","1:27:56"],
+    ["Baile","1:23:54","1:27:56","Baile Salsa"],
     ["Transición","1:27:57","1:28:28"],
-    ["Baile","1:28:29","1:33:04"]
+    ["Baile","1:28:29","1:33:04","Baile Once"]
   ];
   var PLAYS = {
     frozen: {name:"Frozen", key:"frozen-plan-v1", danza:"Ballet y baile", rows:FROZEN},
@@ -386,6 +388,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     if(PLAYS[hh]) CUR = hh; else if(PLAYS[sp]) CUR = sp;
   }catch(e){}
   var ORIGINAL = PLAYS[CUR].rows;
+
   var GROUP = {"Ballet":"danza","Baile":"danza","Escena":"escena","Canción":"cancion","Canción Épica":"cancion","Transición":"trans"};
   var SUMMARY = [
     {g:"escena", label:"Escenas"},
@@ -394,7 +397,8 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     {g:"danza", label:"Ballet y baile"}
   ];
   var KEY = PLAYS[CUR].key;
-  var TOL = 5; // segundos de tolerancia para marcar diferencias
+  var TOL = 5;                       // segundos de tolerancia para el indicador "frente al plan"
+  var SESSION_MAX_MS = 12 * 3600 * 1000;
 
   function $(id){ return document.getElementById(id); }
   function pad(n){ return n < 10 ? "0" + n : "" + n; }
@@ -409,11 +413,11 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     return (h || 0) * 3600 + mi * 60 + s;
   }
   function hms(sec){
-    sec = Math.max(0, Math.round(sec));
+    sec = Math.max(0, Math.floor(sec + 1e-9));
     return Math.floor(sec/3600) + ":" + pad(Math.floor(sec%3600/60)) + ":" + pad(sec%60);
   }
   function ms(sec){
-    sec = Math.max(0, Math.round(sec));
+    sec = Math.max(0, Math.floor(sec + 1e-9));
     if(sec >= 3600) return hms(sec);
     return Math.floor(sec/60) + ":" + pad(sec%60);
   }
@@ -422,16 +426,28 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     return (r < 0 ? "−" : "+") + ms(Math.abs(r));
   }
 
+  /* ---------- plan de la obra ----------
+     Cada parte ocupa desde su INICIO hasta el inicio de la siguiente. El "Final" de la hoja es el
+     último segundo de la parte, así que siempre vale (inicio de la siguiente − 1). */
   function fromRaw(raw){
     var out = [];
     for(var i = 0; i < raw.length; i++){
       var a = parse(raw[i][1]), b = parse(raw[i][2]);
-      if(!GROUP[raw[i][0]] || a === null || b === null || b <= a) return null;
+      if(!GROUP[raw[i][0]] || a === null || b === null) return null;
       out.push({t: raw[i][0], ini: a, fin: b, name: raw[i][3] || ""});
     }
     return out;
   }
+  function normalize(p){ for(var i = 0; i + 1 < p.length; i++) p[i].fin = p[i+1].ini - 1; return p; }
+  function checkPlan(p){
+    for(var i = 0; i + 1 < p.length; i++)
+      if(p[i+1].ini <= p[i].ini) return "El inicio de \"" + (p[i+1].name || p[i+1].t) + "\" debe ser mayor que el inicio de la parte anterior.";
+    var L = p[p.length-1];
+    if(L.fin <= L.ini) return "En la última parte el final debe ser mayor que el inicio.";
+    return "";
+  }
   function loadPlan(){
+    var p = null;
     try{
       var s = localStorage.getItem(KEY);
       if(s){
@@ -443,12 +459,14 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
             if(!raw[q] || raw[q][0] !== ORIGINAL[q][0]) ok = false;
             else merged.push([raw[q][0], raw[q][1], raw[q][2], ORIGINAL[q][3]]);
           }
-          var p = ok ? fromRaw(merged) : null;
-          if(p) return p;
+          p = ok ? fromRaw(merged) : null;
+          if(p) normalize(p);
+          if(p && checkPlan(p)) p = null;
         }
       }
-    }catch(e){}
-    return fromRaw(ORIGINAL);
+    }catch(e){ p = null; }
+    if(!p){ p = normalize(fromRaw(ORIGINAL)); }
+    return p;
   }
   function savePlan(){
     try{
@@ -459,22 +477,96 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   var plan = loadPlan();
   var edit = false;
-  var S;
-  function fresh(){ return {idx:0, running:false, elapsed:0, last:0, actual:[], base:0}; }
-  S = fresh();
+  var auto = true;
+  try{ if(localStorage.getItem("frozen-auto") === "0") auto = false; }catch(e){}
 
   function n(){ return plan.length; }
-  function dur(i){ return plan[i].fin - plan[i].ini; }
+  function start(i){ return plan[i].ini; }
+  function endOf(i){ return i + 1 < n() ? plan[i+1].ini : plan[i].fin; }
+  function span(i){ return endOf(i) - start(i); }
   // La numeración de las partes es interna: en pantalla solo se ve el nombre.
   function label(i){ return plan[i].name || plan[i].t; }
-  function totalPlan(){ return plan[n()-1].fin; }
-  function sumDur(){ var s = 0; for(var i = 0; i < n(); i++) s += dur(i); return s; }
+  function totalEnd(){ return plan[n()-1].fin; }
+  function totalSpan(){ return totalEnd() - start(0); }
+  function partAt(t){                       // t en milisegundos de la obra
+    var s = t / 1000, k = 0;
+    for(var i = 0; i < n(); i++){ if(plan[i].ini <= s) k = i; else break; }
+    return k;
+  }
+  function sig(){ return plan.map(function(p){ return p.ini; }).join(",") + "|" + totalEnd(); }
+
+  /* ---------- estado del cronómetro ----------
+     El reloj de la obra NO acumula pasos: se calcula siempre a partir de la hora real del equipo
+     (Date.now). baseMs = tiempo de la obra en el momento anchorWall. Mientras corre:
+        tiempo de la obra = baseMs + (ahora − anchorWall)
+     Así no se desfasa aunque el navegador atrase los temporizadores, la pantalla se apague o la
+     página se recargue. */
+  function freshAt(i){
+    return {running:false, baseMs:start(i) * 1000, anchorWall:0, lastShow:start(i) * 1000,
+            idx:i, drift:0, done:false, finalMs:0, actual:[]};
+  }
+  var S = freshAt(0);
+
+  function clockNow(){
+    var now = Date.now();
+    if(S.done) return S.finalMs;
+    if(!S.running) return S.baseMs;
+    var t = S.baseMs + (now - S.anchorWall);
+    if(t < S.lastShow){                         // el reloj del equipo retrocedió: no se retrocede la obra
+      S.baseMs = S.lastShow; S.anchorWall = now; t = S.lastShow;
+    }
+    S.lastShow = t;
+    if(auto && t >= totalEnd() * 1000){        // fin natural de la obra
+      S.done = true; S.running = false; S.finalMs = totalEnd() * 1000; S.baseMs = S.finalMs; S.idx = n();
+      releaseWake(); persist();
+      return S.finalMs;
+    }
+    return t;
+  }
+  function curIdx(t){ return S.done ? n() : (auto ? partAt(t) : Math.min(S.idx, n() - 1)); }
+  function progressed(){ return S.done || S.running || S.baseMs > start(0) * 1000 || S.actual.length > 0; }
+
+  /* ---------- sesión (se recupera si se recarga la página) ---------- */
+  function sKey(){ return "frozen-session-v2:" + CUR; }
+  function persist(){
+    try{
+      localStorage.setItem(sKey(), JSON.stringify({v:2, sig:sig(), run:S.running, base:S.baseMs, anchor:S.anchorWall,
+        idx:S.idx, drift:S.drift, done:S.done, fin:S.finalMs, act:S.actual}));
+    }catch(e){}
+  }
+  function restore(){
+    try{
+      var o = JSON.parse(localStorage.getItem(sKey()));
+      if(!o || o.v !== 2 || o.sig !== sig()) return null;
+      var now = Date.now();
+      if(o.run && (now - o.anchor > SESSION_MAX_MS || now < o.anchor)) return null;
+      if(typeof o.base !== "number" || o.base < 0 || o.base > totalEnd() * 1000 + 1000) return null;
+      var st = freshAt(0);
+      st.running = !!o.run; st.baseMs = o.base; st.anchorWall = o.anchor; st.lastShow = o.base;
+      st.idx = Math.max(0, Math.min(n() - 1, o.idx | 0)); st.drift = +o.drift || 0;
+      st.done = !!o.done; st.finalMs = +o.fin || 0;
+      st.actual = Array.isArray(o.act) ? o.act : [];
+      if(st.done){ st.running = false; st.idx = n(); }
+      return st;
+    }catch(e){ return null; }
+  }
+
+  /* ---------- pantalla encendida ---------- */
+  var wake = null;
+  function requestWake(){
+    try{
+      if(navigator.wakeLock && !wake) navigator.wakeLock.request("screen").then(function(w){
+        wake = w; w.addEventListener("release", function(){ wake = null; });
+      }).catch(function(){});
+    }catch(e){}
+  }
+  function releaseWake(){ try{ if(wake){ wake.release(); wake = null; } }catch(e){} }
 
   /* ---------- construcción ---------- */
   function buildSegs(){
     var h = "";
     for(var i = 0; i < n(); i++){
-      h += '<div class="seg ' + GROUP[plan[i].t] + '" id="seg' + i + '" style="flex:' + dur(i) + ' 0 0" title="' + label(i) + ' (' + ms(dur(i)) + ')"></div>';
+      h += '<div class="seg ' + GROUP[plan[i].t] + '" id="seg' + i + '" style="flex:' + span(i) + ' 0 0" title="' + label(i) + ' (' + ms(span(i)) + ')"></div>';
     }
     $("segs").innerHTML = h;
   }
@@ -493,96 +585,92 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
         '<td><button class="go" type="button" data-go="' + i + '" aria-label="Empezar desde ' + label(i) + '"><i class="tri"></i></button></td>' +
         '<td><span class="type"><i class="dot" style="background:var(--t-' + GROUP[p.t] + ')"></i>' + label(i) + '</span></td>' +
         '<td class="t">' + a + '</td><td class="t">' + b + '</td>' +
-        '<td class="t r" id="plan' + i + '">' + ms(dur(i)) + '</td></tr>';
+        '<td class="t r" id="plan' + i + '">' + ms(span(i)) + '</td></tr>';
     }
     $("rows").innerHTML = h;
   }
   function buildAll(){
     buildSegs(); buildRows();
-    $("sub").textContent = "Cronómetro de ensayo · duración total " + hms(totalPlan());
-    render();
-  }
-
-  /* ---------- cálculos ---------- */
-  function elapsedSec(){ return S.elapsed / 1000; }
-  function completedSum(){
-    var s = 0;
-    for(var j = 0; j < S.idx && j < n(); j++) if(S.actual[j] != null) s += S.actual[j];
-    return s;
-  }
-  function driftSec(){
-    var d = 0;
-    for(var j = 0; j < S.idx && j < n(); j++) if(S.actual[j] != null) d += S.actual[j] - dur(j);
-    if(S.idx < n()){ var e = elapsedSec() - dur(S.idx); if(e > 0) d += e; }
-    return d;
-  }
-  // El reloj de la obra suma el hueco de 1 s que hay entre una parte y la siguiente en el plan.
-  function gap(j){ return j + 1 < n() ? Math.max(0, plan[j+1].ini - plan[j].fin) : 0; }
-  function clockSec(){
-    var s = S.base;
-    for(var j = 0; j < S.idx && j < n(); j++) if(S.actual[j] != null) s += S.actual[j] + gap(j);
-    return s + (S.idx < n() ? elapsedSec() : 0);
+    $("sub").textContent = "Cronómetro de ensayo · duración total " + hms(totalSpan());
+    lastKey = ""; lastIdx = -2;
+    render(true);
   }
 
   /* ---------- pintar ---------- */
-  function render(){
-    var i = S.idx, fin = i >= n();
+  var lastKey = "", lastIdx = -2, lastPh = "", nextTimer = null;
+  // Cada número de la pantalla cambia justo cuando el reloj de la obra cruza un segundo exacto.
+  // En vez de revisar "de vez en cuando", se programa la siguiente actualización para ese instante.
+  function schedule(t){
+    if(nextTimer){ clearTimeout(nextTimer); nextTimer = null; }
+    if(!S.running) return;
+    var wait = 1000 - (t % 1000);
+    nextTimer = setTimeout(function(){ nextTimer = null; render(false); }, Math.max(1, wait));
+  }
+  function render(force){
+    var t = clockNow();
+    schedule(t);
+    var fin = S.done, i = curIdx(t);
     var big = $("big"), bigTxt = $("bigTxt");
+    var rem = 0, el = 0;
+    if(!fin){
+      rem = Math.ceil((endOf(i) * 1000 - t) / 1000);
+      el = Math.max(0, Math.floor((t - start(i) * 1000) / 1000));
+    }
+    var clockSec = Math.floor((fin ? S.finalMs : t) / 1000);
+    var canPrev = fin || i > 0 || (t - start(0) * 1000) >= 1;
+    var key = [i, rem, el, clockSec, S.running ? 1 : 0, Math.round(S.drift), fin ? 1 : 0, canPrev ? 1 : 0, auto ? 1 : 0].join("|");
+
+    // la línea de tiempo se mueve de forma continua
+    var pct = fin ? 100 : Math.max(0, Math.min(100, (t / 1000 - start(0)) / totalSpan() * 100));
+    var pcts = pct.toFixed(2) + "%";
+    if(pcts !== lastPh){ $("ph").style.left = pcts; lastPh = pcts; }
+
+    if(key === lastKey && !force) return;
+    lastKey = key;
+
     if(fin){
       $("pos").textContent = "Fin del ensayo";
       $("curName").textContent = "Obra terminada";
       $("curDot").style.background = "var(--accent)";
-      bigTxt.textContent = hms(clockSec());
+      bigTxt.textContent = hms(S.finalMs / 1000);
       big.className = "big";
-      $("bigCap").innerHTML = "Tiempo real de la obra. El plan era <strong>" + hms(totalPlan()) + "</strong>.";
+      $("bigCap").innerHTML = "Tiempo real de la obra. El plan era <strong>" + hms(totalSpan()) + "</strong>.";
       $("next").textContent = "—";
     } else {
       var p = plan[i];
       $("pos").textContent = "Ahora";
       $("curName").textContent = label(i);
       $("curDot").style.background = "var(--t-" + GROUP[p.t] + ")";
-      var rem = Math.ceil(dur(i) - elapsedSec());
-      if(rem >= 0){ bigTxt.textContent = ms(rem); big.className = "big" + (rem <= 10 && dur(i) > 20 ? " warn" : ""); }
+      if(rem >= 0){ bigTxt.textContent = ms(rem); big.className = "big" + (rem <= 10 && span(i) > 20 ? " warn" : ""); }
       else { bigTxt.textContent = "+" + ms(-rem); big.className = "big over"; }
-      $("bigCap").innerHTML = (rem >= 0 ? "Tiempo restante" : "Tiempo excedido") + " · plan <strong>" + ms(dur(i)) + "</strong> · transcurrido <strong>" + ms(elapsedSec()) + "</strong>";
-      if(i + 1 < n()){
-        var q = plan[i+1];
-        $("next").innerHTML = '<b>' + label(i+1) + '</b> (' + ms(dur(i+1)) + ')';
-      } else { $("next").textContent = "Última parte"; }
+      $("bigCap").innerHTML = (rem >= 0 ? "Tiempo restante" : "Tiempo excedido") + " · duración <strong>" + ms(span(i)) + "</strong> · transcurrido <strong>" + ms(el) + "</strong>";
+      if(i + 1 < n()) $("next").innerHTML = '<b>' + label(i+1) + '</b> (' + ms(span(i+1)) + ')';
+      else $("next").textContent = "Última parte";
     }
-    $("clock").innerHTML = hms(clockSec()) + ' <small>/ ' + hms(totalPlan()) + '</small>';
-    var d = Math.round(driftSec()), dv = $("drift");
-    if(Math.abs(d) <= TOL && !(fin && d !== 0)){ dv.textContent = "Al día"; dv.className = "v"; }
+    $("clock").innerHTML = hms(clockSec) + ' <small>/ ' + hms(totalEnd()) + '</small>';
+    var d = Math.round(S.drift), dv = $("drift");
+    if(Math.abs(d) <= TOL){ dv.textContent = "Al día"; dv.className = "v"; }
     else if(d > 0){ dv.innerHTML = "+" + ms(d) + " <small>atraso</small>"; dv.className = "v late"; }
     else { dv.innerHTML = "−" + ms(-d) + " <small>adelanto</small>"; dv.className = "v early"; }
 
-    // botones
     var go = $("btnGo");
-    go.textContent = S.running ? "Pausar" : (S.elapsed > 0 || S.idx > 0 ? "Continuar" : "Iniciar");
+    go.textContent = S.running ? "Pausar" : (progressed() ? "Continuar" : "Iniciar");
     go.disabled = fin;
     $("btnNext").disabled = fin;
-    $("btnPrev").disabled = (S.idx === 0 && S.elapsed === 0);
+    $("btnPrev").disabled = !canPrev;
 
-    // franja
-    var tp = sumDur(), before = 0;
-    for(var k = 0; k < Math.min(i, n()); k++) before += dur(k);
-    var within = fin ? 0 : Math.min(elapsedSec(), dur(i));
-    $("ph").style.left = (tp ? Math.min(100, (before + within) / tp * 100) : 0) + "%";
-    for(var s = 0; s < n(); s++){
-      var el = $("seg" + s);
-      if(el) el.className = "seg " + GROUP[plan[s].t] + (s === i ? " cur" : (S.actual[s] != null ? " done" : ""));
-    }
-
-    // filas
-    for(var r = 0; r < n(); r++){
-      var row = $("row" + r);
-      if(!row) continue;
-      var done = S.actual[r] != null;
-      row.className = "row" + (r === i ? " cur" : (!done && r < i ? " skip" : ""));
+    if(i !== lastIdx){
+      lastIdx = i;
+      for(var s = 0; s < n(); s++){
+        var sg = $("seg" + s);
+        if(sg) sg.className = "seg " + GROUP[plan[s].t] + (s === i ? " cur" : (s < i ? " done" : ""));
+        var row = $("row" + s);
+        if(row) row.className = "row" + (s === i ? " cur" : (s < i ? " skip" : ""));
+      }
+      renderSummary();
     }
     $("ptName").textContent = fin ? "Obra terminada" : $("curName").textContent;
     $("ptDot").style.background = $("curDot").style.background;
-    renderSummary();
     fitAll();
   }
   function renderSummary(){
@@ -591,7 +679,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       var cnt = 0, pl = 0, rl = 0, any = false;
       for(var i = 0; i < n(); i++){
         if(GROUP[plan[i].t] !== SUMMARY[g].g) continue;
-        cnt++; pl += dur(i);
+        cnt++; pl += span(i);
         if(S.actual[i] != null){ rl += S.actual[i]; any = true; }
       }
       h += '<tr><td><span class="type"><i class="dot" style="background:var(--t-' + SUMMARY[g].g + ')"></i>' + SUMMARY[g].label + '</span></td>' +
@@ -634,61 +722,75 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   document.addEventListener("fullscreenchange", function(){ setTimeout(fitAll, 150); });
   try{ if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ ptKey = ""; bigKey = ""; fitAll(); }); }catch(e){}
 
-  /* ---------- reloj ---------- */
-  setInterval(function(){
-    if(S.running){
-      var now = performance.now();
-      S.elapsed += now - S.last; S.last = now;
-      if(auto){
-        // pasa solo a la parte siguiente al cumplirse el tiempo del plan, sin perder el sobrante
-        while(S.idx < n() && S.elapsed >= dur(S.idx) * 1000){
-          S.actual[S.idx] = dur(S.idx);
-          S.elapsed -= dur(S.idx) * 1000;
-          S.idx++;
-        }
-        if(S.idx >= n()){ S.running = false; S.elapsed = 0; }
-      }
-      render();
-    }
-  }, 100);
-
-  function toggle(){
-    if(S.idx >= n()) return;
-    if(S.running){ S.running = false; }
-    else {
-      S.running = true; S.last = performance.now();
-      try{ if(navigator.wakeLock) navigator.wakeLock.request("screen").catch(function(){}); }catch(e){}
-    }
-    render();
-  }
-  function next(){
-    if(S.idx >= n()) return;
-    if(S.elapsed > 0) S.actual[S.idx] = Math.round(S.elapsed / 1000);
-    S.idx++; S.elapsed = 0;
-    if(S.idx >= n()) S.running = false;
-    else if(S.running) S.last = performance.now();
-    render();
-  }
-  function prev(){
-    if(S.idx === 0 && S.elapsed === 0) return;
-    if(S.elapsed > 1500 && S.idx < n()){ S.elapsed = 0; if(S.running) S.last = performance.now(); render(); return; }
-    if(S.idx === 0){ S.elapsed = 0; render(); return; }
-    S.idx--;
-    S.elapsed = (S.actual[S.idx] != null ? S.actual[S.idx] : 0) * 1000;
-    S.actual[S.idx] = null;
-    if(S.running) S.last = performance.now();
-    render();
-  }
-  function reset(){ S = fresh(); setMsg(""); render(); }
-  function jump(i){
-    if(edit) return;
-    S = fresh();
-    S.idx = i; S.base = plan[i].ini;
-    setMsg("Empiezas desde \"" + label(i) + "\". El reloj de la obra arranca en " + hms(plan[i].ini) + ".");
-    render();
-  }
+  /* ---------- reloj: se vuelve a leer la hora real 20 veces por segundo ---------- */
+  setInterval(function(){ if(S.running) render(false); }, 100);
+  function resync(){ render(true); if(S.running) requestWake(); }
+  document.addEventListener("visibilitychange", function(){ if(!document.hidden) resync(); });
+  window.addEventListener("pageshow", resync);
+  window.addEventListener("focus", resync);
 
   function setMsg(t, err){ var m = $("msg"); m.textContent = t; m.className = "msg" + (err ? " err" : ""); }
+
+  /* ---------- acciones ---------- */
+  function toggle(){
+    if(S.done) return;
+    if(S.running){
+      var t = clockNow();
+      if(!S.done){ S.baseMs = t; S.running = false; }
+      releaseWake();
+    } else {
+      S.running = true; S.anchorWall = Date.now(); S.lastShow = S.baseMs;
+      requestWake();
+    }
+    persist(); render(true);
+  }
+  function next(){
+    if(S.done) return;
+    var t = clockNow();
+    if(S.done){ render(true); return; }
+    var i = curIdx(t), el = (t - start(i) * 1000) / 1000;
+    if(el > 0.5) S.actual[i] = Math.round(el);          // duración real medida de esa parte
+    if(i + 1 >= n()){
+      S.done = true; S.running = false; S.finalMs = t; S.baseMs = t; S.idx = n();
+      releaseWake();
+    } else {
+      S.drift += (t - start(i + 1) * 1000) / 1000;       // negativo: se pasó a la siguiente antes de tiempo
+      S.idx = i + 1; S.baseMs = start(i + 1) * 1000; S.anchorWall = Date.now(); S.lastShow = S.baseMs;
+    }
+    persist(); render(true);
+  }
+  function prev(){
+    var t = clockNow();
+    if(S.done){
+      S.done = false; S.running = false; S.idx = n() - 1; S.baseMs = start(n() - 1) * 1000; S.lastShow = S.baseMs;
+      S.actual[n() - 1] = undefined; persist(); render(true); return;
+    }
+    var i = curIdx(t), el = (t - start(i) * 1000) / 1000;
+    var tgt = (el > 1.5 || i === 0) ? i : i - 1;         // dentro del primer segundo vuelve a la parte anterior
+    S.idx = tgt; S.baseMs = start(tgt) * 1000; S.anchorWall = Date.now(); S.lastShow = S.baseMs;
+    S.actual[tgt] = undefined;
+    persist(); render(true);
+  }
+  var resetArmed = null;
+  function reset(){
+    var btn = $("btnReset");
+    if(progressed() && !resetArmed){
+      btn.textContent = "¿Seguro? Toca otra vez";
+      resetArmed = setTimeout(function(){ resetArmed = null; btn.textContent = "Reiniciar"; }, 4000);
+      return;
+    }
+    if(resetArmed){ clearTimeout(resetArmed); resetArmed = null; }
+    btn.textContent = "Reiniciar";
+    releaseWake();
+    S = freshAt(0); setMsg(""); persist(); render(true);
+  }
+  function jump(i){
+    if(edit) return;
+    if(S.running){ setMsg("Pausa el cronómetro para elegir desde qué parte empezar.", true); return; }
+    S = freshAt(i);
+    setMsg("Empiezas desde \"" + label(i) + "\". El reloj de la obra arranca en " + hms(start(i)) + ".");
+    persist(); render(true);
+  }
 
   /* ---------- eventos ---------- */
   /* tema: automático (sigue al dispositivo), claro u oscuro */
@@ -708,17 +810,17 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   });
   applyTheme();
 
-  var auto = true;
-  try{ if(localStorage.getItem("frozen-auto") === "0") auto = false; }catch(e){}
   function applyAuto(){
     var b = $("btnAuto");
     b.setAttribute("aria-pressed", auto ? "true" : "false");
     b.textContent = "Avance automático: " + (auto ? "sí" : "no");
   }
   $("btnAuto").addEventListener("click", function(){
+    var t = clockNow();
+    if(auto && !S.done) S.idx = partAt(t);               // al apagarlo, la parte actual se queda fija
     auto = !auto;
     try{ localStorage.setItem("frozen-auto", auto ? "1" : "0"); }catch(e){}
-    applyAuto();
+    applyAuto(); persist(); render(true);
   });
   applyAuto();
 
@@ -742,6 +844,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     }catch(e){}
   });
   $("btnEdit").addEventListener("click", function(){
+    if(!edit && S.running){ setMsg("Pausa el cronómetro antes de editar los tiempos.", true); return; }
     edit = !edit;
     document.body.classList.toggle("editing", edit);
     this.setAttribute("aria-pressed", edit ? "true" : "false");
@@ -750,7 +853,8 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     buildAll();
   });
   $("btnRestore").addEventListener("click", function(){
-    plan = fromRaw(ORIGINAL); savePlan(); S = fresh(); setMsg("Se restauraron los tiempos originales."); buildAll();
+    plan = normalize(fromRaw(ORIGINAL)); savePlan(); S = freshAt(0); persist();
+    setMsg("Se restauraron los tiempos originales."); buildAll();
   });
 
   $("rows").addEventListener("click", function(e){
@@ -764,15 +868,16 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     var i = parseInt(el.getAttribute("data-i"), 10), k = el.getAttribute("data-k");
     var v = parse(el.value);
     if(v === null){ setMsg("No entendí \"" + el.value + "\". Escríbelo como h:mm:ss, por ejemplo 0:02:27.", true); el.value = hms(plan[i][k]); return; }
-    var old = plan[i][k];
-    plan[i][k] = v;
-    if(plan[i].fin <= plan[i].ini){
-      plan[i][k] = old; el.value = hms(old);
-      setMsg("En \"" + label(i) + "\" el final debe ser mayor que el inicio.", true); return;
-    }
-    savePlan(); S = fresh();
-    setMsg("Guardado. El cronómetro se reinició con los nuevos tiempos.");
-    var f = document.activeElement && document.activeElement.id;
+    var backup = plan.map(function(p){ return {t:p.t, ini:p.ini, fin:p.fin, name:p.name}; });
+    // el final de una parte y el inicio de la siguiente siempre van pegados (final = siguiente inicio − 1)
+    if(k === "ini"){ plan[i].ini = v; }
+    else if(i + 1 < n()){ plan[i+1].ini = v + 1; }
+    else { plan[i].fin = v; }
+    normalize(plan);
+    var err = checkPlan(plan);
+    if(err){ plan = backup; setMsg(err, true); buildAll(); return; }
+    savePlan(); S = freshAt(0); persist();
+    setMsg("Guardado. Los tiempos de las partes vecinas se ajustaron y el cronómetro se reinició.");
     buildAll();
   });
 
@@ -791,11 +896,11 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   /* ---------- copiar resultados ---------- */
   function resultsText(){
-    var L = ["Parte\tInicio\tFinal\tDuración\tReal\tDiferencia"];
+    var L = ["Parte\tInicio\tFinal\tDuración\tReal medido\tDiferencia"];
     for(var i = 0; i < n(); i++){
       var a = S.actual[i];
-      L.push([label(i), hms(plan[i].ini), hms(plan[i].fin), ms(dur(i)),
-        a != null ? ms(a) : "", a != null ? signed(a - dur(i)) : ""].join("\t"));
+      L.push([label(i), hms(plan[i].ini), hms(plan[i].fin), ms(span(i)),
+        a != null ? ms(a) : "", a != null ? signed(a - span(i)) : ""].join("\t"));
     }
     return L.join("\n");
   }
@@ -826,26 +931,33 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     for(var b = 0; b < bs.length; b++) bs[b].setAttribute("aria-pressed", bs[b].getAttribute("data-play") === key ? "true" : "false");
     try{ localStorage.setItem("frozen-play", key); }catch(e){}
     if(!fromHash){ try{ if(location.hash !== "#" + key) location.hash = key; }catch(e){} }
-    plan = loadPlan(); S = fresh(); pendingPlay = null; setMsg("");
+    plan = loadPlan();
+    var back = restore();
+    S = back || freshAt(0);
+    pendingPlay = null; setMsg("");
+    if(back && progressed()) setMsg(S.running ? "Se recuperó el ensayo en curso: el reloj siguió corriendo mientras la página estaba cerrada." : "Se recuperó el ensayo donde lo dejaste.");
     buildAll();
+    if(S.running) requestWake();
   }
   document.querySelector(".plays").addEventListener("click", function(e){
     var b = e.target.closest("[data-play]");
     if(!b) return;
     var key = b.getAttribute("data-play");
     if(key === CUR) return;
-    var busy = S.idx > 0 || S.elapsed > 0;
-    if(busy && pendingPlay !== key){
-      pendingPlay = key;
-      setMsg("Hay un ensayo en curso. Toca \"" + PLAYS[key].name + "\" otra vez para cambiar de obra y perder esos tiempos.", true);
-      return;
-    }
+    if(S.running){ setMsg("Pausa el cronómetro antes de cambiar de obra.", true); return; }
     setPlay(key, false);
   });
   window.addEventListener("hashchange", function(){
     var k = (location.hash || "").replace("#","");
-    if(PLAYS[k] && k !== CUR) setPlay(k, true);
+    if(PLAYS[k] && k !== CUR && !S.running) setPlay(k, true);
   });
+
+  // Gancho para pruebas automáticas (no cambia nada del funcionamiento).
+  window.__cronometro = {
+    tick: function(){ render(true); },
+    state: function(){ var t = clockNow(); return {t:t, idx:curIdx(t), running:S.running, done:S.done, drift:S.drift, auto:auto}; },
+    plan: function(){ return plan.map(function(p){ return {t:p.t, name:p.name, ini:p.ini, fin:p.fin}; }); }
+  };
 
   setPlay(CUR, true);
 })();
