@@ -156,6 +156,18 @@ textarea.out{width:100%;min-height:140px;font:13px var(--font-mono);padding:10px
 .note{margin:0 0 10px;color:var(--muted);font-size:14px}
 
 body.proj .hide-proj{display:none}
+/* Modo observador: solo se ve el reloj; los controles son del administrador. */
+body.viewer .controls,body.viewer .plays,body.viewer #btnEdit,body.viewer #btnCopy,body.viewer .go,body.viewer .edit-bar{display:none!important}
+body.viewer .row{cursor:default}
+.net{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:13px;white-space:nowrap}
+.net i{width:9px;height:9px;border-radius:50%;background:var(--muted);display:inline-block}
+.net.ok i{background:var(--good,#2e9e5b)}
+.net.bad i{background:var(--bad,#c0392b)}
+body.connecting .panel,body.connecting .strip-box{opacity:.35}
+.pinbox{display:none;gap:6px;align-items:center}
+.pinbox.on{display:inline-flex}
+.pinbox input{min-height:36px;width:110px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit}
+body.proj #btnAdmin,body.proj .pinbox{display:none!important}
 /* Modo proyección: todo cabe en una pantalla (sin scroll). Arriba título y botones, en medio el temporizador que ocupa el espacio sobrante, abajo datos, botones y línea de tiempo. */
 .ptitle{display:none}
 .obra-tag{display:none}
@@ -231,6 +243,9 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       <button class="btn small" id="btnTheme" type="button" aria-label="Cambiar tema de color">Tema: automático</button>
       <button class="btn small" id="btnProj" aria-pressed="false" type="button">Modo proyección</button>
       <button class="btn small" id="btnEdit" aria-pressed="false" type="button">Editar tiempos</button>
+      <span class="net" id="net" role="status"><i></i><span id="netTxt">Conectando…</span></span>
+      <button class="btn small" id="btnAdmin" type="button">Administrador</button>
+      <span class="pinbox" id="pinBox"><input id="pinIn" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" aria-label="PIN de administrador"><button class="btn small" id="pinOk" type="button">Entrar</button></span>
     </div>
   </header>
 
@@ -302,8 +317,30 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   </section>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
 (function(){
+  /* ---------- sincronización entre dispositivos ----------
+     El administrador escribe en Firebase cada acción (iniciar, pausar, siguiente, anterior, reiniciar...).
+     Los observadores NO reciben el reloj segundo a segundo: reciben el punto de partida y el estado, y cada
+     pantalla corre el mismo motor de tiempo real, corregido con la diferencia entre su reloj y el del servidor. */
+  var FB_CONFIG = {
+    apiKey: "AIzaSyCfLB3CVtIZAHNJi3mub6yMzusKL5Kf-4o",
+    authDomain: "cronometro-obras.firebaseapp.com",
+    databaseURL: "https://cronometro-obras-default-rtdb.firebaseio.com",
+    projectId: "cronometro-obras",
+    storageBucket: "cronometro-obras.firebasestorage.app",
+    messagingSenderId: "207385402891",
+    appId: "1:207385402891:web:fcd5a53debef04d1c9b10e"
+  };
+  var ADMIN_PIN = "obras2026";
+  var ROOT = "cronometro";
+  var isAdmin = false;
+  try{ isAdmin = localStorage.getItem("cron-admin") === "1"; }catch(e){}
+  var NET = {offset:0, db:null, ready:false, linked:false, my:Math.random().toString(36).slice(2,10), stRef:null, stCb:null, playFirst:true, failed:false};
+  function now(){ return Date.now() + NET.offset; }
+
   var FROZEN = [
     ["Ballet","0:00:00","0:02:27"],
     ["Transición","0:02:28","0:02:58"],
@@ -508,12 +545,12 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   var S = freshAt(0);
 
   function clockNow(){
-    var now = Date.now();
+    var nw = now();
     if(S.done) return S.finalMs;
     if(!S.running) return S.baseMs;
-    var t = S.baseMs + (now - S.anchorWall);
+    var t = S.baseMs + (nw - S.anchorWall);
     if(t < S.lastShow){                         // el reloj del equipo retrocedió: no se retrocede la obra
-      S.baseMs = S.lastShow; S.anchorWall = now; t = S.lastShow;
+      S.baseMs = S.lastShow; S.anchorWall = nw; t = S.lastShow;
     }
     S.lastShow = t;
     if(auto && t >= totalEnd() * 1000){        // fin natural de la obra
@@ -529,17 +566,19 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   /* ---------- sesión (se recupera si se recarga la página) ---------- */
   function sKey(){ return "frozen-session-v2:" + CUR; }
   function persist(){
+    if(!isAdmin) return;                       // los observadores no guardan nada: siempre siguen al administrador
     try{
       localStorage.setItem(sKey(), JSON.stringify({v:2, sig:sig(), run:S.running, base:S.baseMs, anchor:S.anchorWall,
         idx:S.idx, drift:S.drift, done:S.done, fin:S.finalMs, act:S.actual}));
     }catch(e){}
+    publish();
   }
   function restore(){
     try{
       var o = JSON.parse(localStorage.getItem(sKey()));
       if(!o || o.v !== 2 || o.sig !== sig()) return null;
-      var now = Date.now();
-      if(o.run && (now - o.anchor > SESSION_MAX_MS || now < o.anchor)) return null;
+      var nw = now();
+      if(o.run && (nw - o.anchor > SESSION_MAX_MS || nw < o.anchor)) return null;
       if(typeof o.base !== "number" || o.base < 0 || o.base > totalEnd() * 1000 + 1000) return null;
       var st = freshAt(0);
       st.running = !!o.run; st.baseMs = o.base; st.anchorWall = o.anchor; st.lastShow = o.base;
@@ -733,19 +772,19 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
 
   /* ---------- acciones ---------- */
   function toggle(){
-    if(S.done) return;
+    if(!isAdmin || S.done) return;
     if(S.running){
       var t = clockNow();
       if(!S.done){ S.baseMs = t; S.running = false; }
       releaseWake();
     } else {
-      S.running = true; S.anchorWall = Date.now(); S.lastShow = S.baseMs;
+      S.running = true; S.anchorWall = now(); S.lastShow = S.baseMs;
       requestWake();
     }
     persist(); render(true);
   }
   function next(){
-    if(S.done) return;
+    if(!isAdmin || S.done) return;
     var t = clockNow();
     if(S.done){ render(true); return; }
     var i = curIdx(t), el = (t - start(i) * 1000) / 1000;
@@ -755,11 +794,12 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
       releaseWake();
     } else {
       S.drift += (t - start(i + 1) * 1000) / 1000;       // negativo: se pasó a la siguiente antes de tiempo
-      S.idx = i + 1; S.baseMs = start(i + 1) * 1000; S.anchorWall = Date.now(); S.lastShow = S.baseMs;
+      S.idx = i + 1; S.baseMs = start(i + 1) * 1000; S.anchorWall = now(); S.lastShow = S.baseMs;
     }
     persist(); render(true);
   }
   function prev(){
+    if(!isAdmin) return;
     var t = clockNow();
     if(S.done){
       S.done = false; S.running = false; S.idx = n() - 1; S.baseMs = start(n() - 1) * 1000; S.lastShow = S.baseMs;
@@ -767,12 +807,13 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     }
     var i = curIdx(t), el = (t - start(i) * 1000) / 1000;
     var tgt = (el > 1.5 || i === 0) ? i : i - 1;         // dentro del primer segundo vuelve a la parte anterior
-    S.idx = tgt; S.baseMs = start(tgt) * 1000; S.anchorWall = Date.now(); S.lastShow = S.baseMs;
+    S.idx = tgt; S.baseMs = start(tgt) * 1000; S.anchorWall = now(); S.lastShow = S.baseMs;
     S.actual[tgt] = undefined;
     persist(); render(true);
   }
   var resetArmed = null;
   function reset(){
+    if(!isAdmin) return;
     var btn = $("btnReset");
     if(progressed() && !resetArmed){
       btn.textContent = "¿Seguro? Toca otra vez";
@@ -785,7 +826,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     S = freshAt(0); setMsg(""); persist(); render(true);
   }
   function jump(i){
-    if(edit) return;
+    if(edit || !isAdmin) return;
     if(S.running){ setMsg("Pausa el cronómetro para elegir desde qué parte empezar.", true); return; }
     S = freshAt(i);
     setMsg("Empiezas desde \"" + label(i) + "\". El reloj de la obra arranca en " + hms(start(i)) + ".");
@@ -816,6 +857,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     b.textContent = "Avance automático: " + (auto ? "sí" : "no");
   }
   $("btnAuto").addEventListener("click", function(){
+    if(!isAdmin) return;
     var t = clockNow();
     if(auto && !S.done) S.idx = partAt(t);               // al apagarlo, la parte actual se queda fija
     auto = !auto;
@@ -844,6 +886,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     }catch(e){}
   });
   $("btnEdit").addEventListener("click", function(){
+    if(!isAdmin) return;
     if(!edit && S.running){ setMsg("Pausa el cronómetro antes de editar los tiempos.", true); return; }
     edit = !edit;
     document.body.classList.toggle("editing", edit);
@@ -853,6 +896,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     buildAll();
   });
   $("btnRestore").addEventListener("click", function(){
+    if(!isAdmin) return;
     plan = normalize(fromRaw(ORIGINAL)); savePlan(); S = freshAt(0); persist();
     setMsg("Se restauraron los tiempos originales."); buildAll();
   });
@@ -864,7 +908,7 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   });
   $("rows").addEventListener("change", function(e){
     var el = e.target;
-    if(!el.classList.contains("tin")) return;
+    if(!isAdmin || !el.classList.contains("tin")) return;
     var i = parseInt(el.getAttribute("data-i"), 10), k = el.getAttribute("data-k");
     var v = parse(el.value);
     if(v === null){ setMsg("No entendí \"" + el.value + "\". Escríbelo como h:mm:ss, por ejemplo 0:02:27.", true); el.value = hms(plan[i][k]); return; }
@@ -932,16 +976,19 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     try{ localStorage.setItem("frozen-play", key); }catch(e){}
     if(!fromHash){ try{ if(location.hash !== "#" + key) location.hash = key; }catch(e){} }
     plan = loadPlan();
-    var back = restore();
+    var back = isAdmin ? restore() : null;      // el observador nunca usa datos guardados en el dispositivo
     S = back || freshAt(0);
     pendingPlay = null; setMsg("");
+    if(!fromHash && isAdmin) publishPlay(key);
+    NET.ready = false; setConn();
+    subscribeState();
     if(back && progressed()) setMsg(S.running ? "Se recuperó el ensayo en curso: el reloj siguió corriendo mientras la página estaba cerrada." : "Se recuperó el ensayo donde lo dejaste.");
     buildAll();
     if(S.running) requestWake();
   }
   document.querySelector(".plays").addEventListener("click", function(e){
     var b = e.target.closest("[data-play]");
-    if(!b) return;
+    if(!b || !isAdmin) return;
     var key = b.getAttribute("data-play");
     if(key === CUR) return;
     if(S.running){ setMsg("Pausa el cronómetro antes de cambiar de obra.", true); return; }
@@ -949,8 +996,131 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
   });
   window.addEventListener("hashchange", function(){
     var k = (location.hash || "").replace("#","");
-    if(PLAYS[k] && k !== CUR && !S.running) setPlay(k, true);
+    if(isAdmin && PLAYS[k] && k !== CUR && !S.running) setPlay(k, false);
   });
+
+
+  /* ---------- sincronización: leer y escribir en Firebase ---------- */
+  function toArr(v, len){
+    var out = [];
+    for(var i = 0; i < len; i++){
+      var x = v && (Array.isArray(v) ? v[i] : v[i]);
+      out.push(typeof x === "number" ? x : null);
+    }
+    return out;
+  }
+  function stateOut(){
+    var act = [], pl = [];
+    for(var i = 0; i < n(); i++){ act.push(typeof S.actual[i] === "number" ? S.actual[i] : null); pl.push(plan[i].ini); }
+    pl.push(plan[n() - 1].fin);
+    return {run:!!S.running, base:S.baseMs, anchor:S.anchorWall, idx:S.idx, drift:S.drift, done:!!S.done,
+            fin:S.finalMs, act:act, auto:!!auto, pl:pl, by:NET.my, n:Date.now() % 1000000};
+  }
+  function publish(){
+    if(!isAdmin || !NET.db || NET.failed) return;
+    try{ NET.db.ref(ROOT + "/state/" + CUR).set(stateOut()); NET.db.ref(ROOT + "/play").set(CUR); }catch(e){}
+  }
+  function publishPlay(key){
+    if(!isAdmin || !NET.db) return;
+    try{ NET.db.ref(ROOT + "/play").set(key); }catch(e){}
+  }
+  function setConn(){
+    var el = $("net"), tx = $("netTxt");
+    if(!NET.db){ el.className = "net bad"; tx.textContent = "Sin conexión al servidor"; document.body.classList.remove("connecting"); return; }
+    if(NET.linked && NET.ready){ el.className = "net ok"; tx.textContent = isAdmin ? "Administrador · en vivo" : "Observador · en vivo"; document.body.classList.remove("connecting"); }
+    else if(NET.failed){ el.className = "net bad"; tx.textContent = "Sin conexión · el reloj sigue solo"; document.body.classList.remove("connecting"); }
+    else if(NET.ready){ el.className = "net bad"; tx.textContent = "Reconectando… el reloj sigue solo"; document.body.classList.remove("connecting"); }
+    else { el.className = "net"; tx.textContent = "Conectando…"; document.body.classList.toggle("connecting", !isAdmin); }
+  }
+  function applyRemote(v){
+    NET.ready = true;
+    if(!v){                                     // todavía no hay estado guardado para esta obra
+      if(isAdmin && progressed()) publish();
+      setConn(); render(true); return;
+    }
+    if(v.by === NET.my){ setConn(); return; }    // eco de lo que escribí yo mismo
+    var pl = toArr(v.pl, n() + 1), okPl = true;
+    for(var i = 0; i <= n(); i++) if(pl[i] === null) okPl = false;
+    var rebuild = false;
+    if(okPl){
+      var cur = plan.map(function(q){ return q.ini; }); cur.push(plan[n() - 1].fin);
+      if(cur.join(",") !== pl.join(",")){
+        var raw = ORIGINAL.map(function(r, k){
+          return [r[0], hms(pl[k]), hms(k + 1 < n() ? pl[k + 1] - 1 : pl[n()]), r[3]];
+        });
+        var np = fromRaw(raw);
+        if(np){ normalize(np); if(!checkPlan(np)){ plan = np; rebuild = true; } }
+      }
+    }
+    var a = !!v.auto;
+    if(a !== auto){ auto = a; applyAuto(); }
+    var st = freshAt(0);
+    st.running = !!v.run; st.baseMs = +v.base || 0; st.anchorWall = +v.anchor || 0; st.lastShow = st.baseMs;
+    st.idx = Math.max(0, Math.min(n() - 1, v.idx | 0)); st.drift = +v.drift || 0;
+    st.done = !!v.done; st.finalMs = +v.fin || 0;
+    var act = toArr(v.act, n()); st.actual = act.map(function(x){ return x === null ? undefined : x; });
+    if(st.done){ st.running = false; st.idx = n(); }
+    S = st;
+    setMsg("");
+    if(rebuild) buildAll(); else render(true);
+    if(S.running) requestWake(); else releaseWake();
+    setConn();
+  }
+  function subscribeState(){
+    if(!NET.db) return;
+    try{
+      if(NET.stRef && NET.stCb) NET.stRef.off("value", NET.stCb);
+      NET.stRef = NET.db.ref(ROOT + "/state/" + CUR);
+      NET.stCb = function(snap){ NET.linked = true; applyRemote(snap.val()); };
+      NET.stRef.on("value", NET.stCb, function(){ NET.failed = true; setConn(); });
+    }catch(e){ NET.failed = true; setConn(); }
+  }
+  function initNet(){
+    if(typeof firebase === "undefined"){ NET.failed = true; setConn(); return; }
+    try{
+      firebase.initializeApp(FB_CONFIG);
+      NET.db = firebase.database();
+      NET.db.ref(".info/serverTimeOffset").on("value", function(s){ NET.offset = +s.val() || 0; render(true); });
+      NET.db.ref(".info/connected").on("value", function(s){
+        NET.linked = !!s.val();
+        if(NET.linked){ NET.failed = false; } setConn();
+      });
+      NET.db.ref(ROOT + "/play").on("value", function(s){
+        var k = s.val();
+        if(!PLAYS[k] || k === CUR) { NET.playFirst = false; return; }
+        if(NET.playFirst || !isAdmin){ NET.playFirst = false; if(!isAdmin || !S.running) setPlay(k, true); }
+      });
+      subscribeState();
+      setTimeout(function(){ if(!NET.ready){ NET.failed = true; setConn(); } }, 8000);
+      setConn();
+    }catch(e){ NET.db = null; NET.failed = true; setConn(); }
+  }
+
+  /* ---------- modo administrador ---------- */
+  function applyMode(){
+    document.body.classList.toggle("viewer", !isAdmin);
+    $("btnAdmin").textContent = isAdmin ? "Salir de administrador" : "Administrador";
+    if(!isAdmin){ edit = false; document.body.classList.remove("editing"); }
+    setConn();
+  }
+  $("btnAdmin").addEventListener("click", function(){
+    if(isAdmin){
+      isAdmin = false; try{ localStorage.removeItem("cron-admin"); }catch(e){}
+      applyMode(); render(true); return;
+    }
+    var box = $("pinBox"); box.classList.toggle("on");
+    if(box.classList.contains("on")) $("pinIn").focus();
+  });
+  function tryPin(){
+    var v = $("pinIn").value.trim();
+    if(v === ADMIN_PIN){
+      isAdmin = true; try{ localStorage.setItem("cron-admin", "1"); }catch(e){}
+      $("pinIn").value = ""; $("pinBox").classList.remove("on");
+      applyMode(); persist(); render(true); setMsg("Modo administrador activado.");
+    } else { $("pinIn").value = ""; setMsg("PIN incorrecto.", true); }
+  }
+  $("pinOk").addEventListener("click", tryPin);
+  $("pinIn").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); tryPin(); } });
 
   // Gancho para pruebas automáticas (no cambia nada del funcionamiento).
   window.__cronometro = {
@@ -959,7 +1129,9 @@ body.proj .legend{font-size:clamp(11px,1.9vh,15px);gap:2px 14px}
     plan: function(){ return plan.map(function(p){ return {t:p.t, name:p.name, ini:p.ini, fin:p.fin}; }); }
   };
 
+  applyMode();
   setPlay(CUR, true);
+  initNet();
 })();
 </script>
 </body>
